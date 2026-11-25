@@ -1,6 +1,6 @@
 # Manual do Franlin Car Veículos
 
-Bem-vindo ao manual do **Franlin Car Veículos**, versão **1.0.0**. Este guia explica, passo a passo, como usar o sistema da oficina.
+Bem-vindo ao manual do **Franlin Car Veículos**, versão **1.0.1**. Este guia explica, passo a passo, como usar o sistema da oficina.
 
 O sistema funciona em um navegador de internet, sem login. Os registros ficam salvos somente no navegador e no dispositivo em que foram digitados. Eles não são sincronizados entre computadores, celulares ou pessoas. Abas abertas no mesmo navegador, perfil e endereço podem receber as alterações salvas umas das outras, como explicado na seção 15.
 
@@ -93,7 +93,7 @@ O **Painel** é o ponto de partida. Ele mostra o mês atual e reúne as informa�
 - **Últimas movimentações** mostra entradas e saídas recentes.
 - **Caixa do mês** resume os valores efetivamente recebidos e pagos.
 
-O aviso de cópia de segurança aparece quando não há cópia recente registrada. A data da cópia é atualizada quando você usa **Baixar cópia**.
+O aviso de cópia de segurança aparece quando não há cópia recente registrada. A data da cópia é atualizada após o download quando o navegador consegue salvar essa informação. Mesmo com o armazenamento cheio, o arquivo da cópia continua disponível para download.
 
 ## 4. Clientes e veículos {#clientes}
 
@@ -190,7 +190,7 @@ A placa e a descrição do veículo serão copiadas para a O.S. Use **Voltar** o
 
 O cartão de cada peça mostra o estoque disponível. Se a quantidade escolhida for maior, o sistema mostra um aviso.
 
-> **Atenção:** o aviso permite montar o orçamento, mas os botões **Cliente aprovou** e **Faturar O.S.** bloqueiam a operação quando uma peça não tem estoque suficiente. Reponha o estoque ou ajuste os itens antes de continuar. Sempre confira também a quantidade física.
+> **Atenção:** o aviso permite montar o orçamento, mas o sistema bloqueia a aprovação ou o faturamento quando não há estoque suficiente. A conferência soma todas as linhas da mesma peça, inclusive linhas repetidas, e também vale ao salvar uma O.S. diretamente como **Aprovada** ou **Faturada**. Reponha o estoque ou ajuste os itens antes de continuar. Sempre confira também a quantidade física.
 
 Enquanto a O.S. estiver em **Orçamento**, nenhuma peça sai do estoque. O desconto é informado no passo 3.
 
@@ -510,7 +510,7 @@ Abra **Contas e caixa** para conferir o mês atual.
 
 O caixa é um resumo dos pagamentos registrados no sistema. Não é um extrato bancário, não possui saldo inicial e não concilia automaticamente com banco, cartão ou dinheiro físico. Registre os recebimentos e pagamentos corretamente para que o resumo seja útil.
 
-Na versão atual, a tela mostra o mês corrente, sem um seletor para outros meses. Compras permitem informar a data de pagamento no cadastro ou na edição. Em despesas já pagas, primeiro use **Reabrir** para poder corrigir a data pela edição.
+Na versão atual, a tela mostra o mês corrente, sem um seletor para outros meses. Compras e despesas permitem informar ou corrigir a data de pagamento no cadastro ou na edição, inclusive quando já estão pagas. A data correta deve ser salva antes de conferir o caixa.
 
 ## 13. Cópias, restauração e limpeza dos dados {#backup}
 
@@ -525,6 +525,8 @@ Na versão atual, a tela mostra o mês corrente, sem um seletor para outros mese
 7. Guarde outra cópia em local seguro, se necessário.
 
 A cópia contém clientes, veículos, fornecedores, peças, estoque, movimentações, O.S., compras, despesas e informações de controle.
+
+O download não depende de o navegador conseguir gravar uma nova informação no armazenamento local. Se o espaço estiver cheio, baixe o arquivo mesmo assim e guarde-o antes de excluir registros.
 
 > **Atenção:** a cópia contém dados pessoais e financeiros e não é criptografada pelo sistema. Não a publique, não a envie por grupos e não a deixe em um computador compartilhado.
 
@@ -541,6 +543,15 @@ Faça uma cópia toda semana, antes de mudanças importantes e antes de trocar d
 7. Confira clientes, O.S., peças e financeiro.
 
 > **Atenção:** restaurar substitui todos os dados locais pelos dados do arquivo. Não é uma mesclagem. Um arquivo inválido ou sem dados reconhecíveis do sistema é rejeitado.
+
+### Aparece o aviso de dados salvos corrompidos
+
+Esse aviso significa que o conteúdo gravado pelo navegador não pôde ser lido com segurança. Para evitar uma perda maior, o sistema bloqueia alterações normais e preserva o conteúdo existente até que você escolha uma recuperação.
+
+1. Se tiver uma cópia de segurança válida, use **Restaurar cópia** em **Ajuda e manual**.
+2. Confira os dados depois da restauração e faça uma nova cópia.
+3. Se não houver cópia válida, os dados corrompidos não podem ser recuperados pelo sistema. Use **Apagar todos os dados** somente se aceitar começar do zero.
+4. Não apague os dados do site nas configurações do navegador antes de tentar restaurar uma cópia.
 
 ### Apagar todos os dados
 
@@ -592,6 +603,12 @@ Não é possível transformar os dados de exemplo em dados reais. Eles devem ser
 
 Se o sistema estiver aberto em duas abas do mesmo navegador, perfil e endereço, uma alteração salva em uma aba atualiza a outra. A tela é recarregada e rascunhos de O.S. ou compras ainda não salvos são descartados nessa atualização. Evite editar o mesmo registro em duas abas ao mesmo tempo. Esse recurso não transfere dados entre dispositivos ou pessoas.
 
+### Se o navegador não conseguir salvar
+
+Quando o armazenamento está cheio ou indisponível, a alteração não é confirmada. O sistema desfaz a operação em memória, inclusive movimentações de estoque, para evitar que a tela mostre algo diferente do que ficou salvo. O carregamento dos dados de exemplo também é desfeito por completo se qualquer gravação intermediária falhar.
+
+Nesse caso, baixe uma cópia de segurança, libere espaço removendo registros que não sejam mais necessários e tente novamente. Não feche a página no meio de uma operação importante.
+
 ### Boas práticas
 
 1. Use um perfil de navegador protegido no dispositivo da oficina.
@@ -626,9 +643,17 @@ O site ser público significa que qualquer pessoa pode abrir o endereço. Isso n
 
 1. Leia a mensagem exibida.
 2. Confira os campos obrigatórios.
-3. Se a mensagem disser que o armazenamento está cheio, faça uma cópia.
-4. Remova registros antigos que não sejam mais necessários.
-5. Tente salvar novamente.
+3. Se disser que o armazenamento está cheio ou indisponível, saiba que a tentativa foi desfeita e os dados anteriores foram mantidos.
+4. Baixe uma cópia de segurança.
+5. Remova registros antigos que não sejam mais necessários.
+6. Tente salvar novamente.
+
+### Aparece aviso de dados corrompidos
+
+1. Não tente cadastrar ou excluir registros para “resolver” o aviso.
+2. Vá para **Ajuda e manual**.
+3. Restaure uma cópia de segurança válida, se existir.
+4. Se não existir cópia, leia a seção **Dados salvos corrompidos** antes de decidir apagar tudo.
 
 ### Os dados desapareceram
 
@@ -749,4 +774,4 @@ Não documente recursos que não existem, como sincronização em nuvem, acesso 
 
 ---
 
-Franlin Car Veículos · Manual do usuário · Versão 1.0.0
+Franlin Car Veículos · Manual do usuário · Versão 1.0.1

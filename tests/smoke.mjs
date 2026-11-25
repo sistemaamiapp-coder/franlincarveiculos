@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 class MemoryStorage {
   #values = new Map();
@@ -162,6 +163,14 @@ test('ui: campos numéricos preservam limites e casas decimais', () => {
   assert.match(html, /step="0\.01"/);
 });
 
+test('ui: formulários usam IDs fixos e não inserem IDs importados no HTML', () => {
+  const source = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /const formId = `/);
+  for (const id of ['form-cliente', 'form-veiculo', 'form-fornecedor', 'form-peca', 'form-despesa', 'form-compra', 'form-item-compra', 'form-peca-os', 'form-mao-obra-os']) {
+    assert.ok(source.includes(`const formId = '${id}';`), `ID fixo ausente: ${id}`);
+  }
+});
+
 test('util: normalização e validação de WhatsApp', () => {
   assert.equal(U.onlyDigits('(27) 99999-1010'), '27999991010');
   assert.equal(U.whatsAppNumber('(27) 99999-1010'), '5527999991010');
@@ -317,6 +326,26 @@ test('store: aprovação e faturamento baixam estoque uma vez', () => {
   assert.equal(S.financeData().receivables.length, 1);
 });
 
+test('store: aprovação direta soma linhas da mesma peça antes de baixar estoque', () => {
+  const client = makeClient();
+  const vehicle = makeVehicle(client.id);
+  const part = makePart({ quantidadeEstoque: 3 });
+  const items = [
+    { tipo: 'peca', pecaId: part.id, descricao: part.nome, quantidade: 2, valorUnitario: 100 },
+    { tipo: 'peca', pecaId: part.id, descricao: part.nome, quantidade: 2, valorUnitario: 100 }
+  ];
+  const before = JSON.stringify(S.store.data);
+  assert.throws(() => makeOrder({ client, vehicle, part, status: 'Aprovada', items }), /Estoque insuficiente/);
+  assert.equal(JSON.stringify(S.store.data), before);
+  assert.equal(S.pecaById(part.id).quantidadeEstoque, 3);
+  assert.equal(S.store.data.ordens.length, 0);
+
+  const order = makeOrder({ client, vehicle, part, items });
+  assert.throws(() => S.setOrderStatus(order.id, 'Aprovada'), /Estoque insuficiente/);
+  assert.equal(S.ordemById(order.id).status, 'Orçamento');
+  assert.equal(S.pecaById(part.id).quantidadeEstoque, 3);
+});
+
 test('store: cancelar, reabrir e excluir restauram estoque', () => {
   const first = orderFixture();
   const initialMovements = S.store.data.movimentacoes.length;
@@ -373,8 +402,11 @@ test('store: movimentação manual e alerta de estoque mínimo', () => {
   assert.equal(entry.saldoAnterior, 5);
   assert.equal(entry.saldoNovo, 8);
   assert.equal(entry.data, '2026-11-22T12:00:00');
-  const exit = S.adjustStock({ pecaId: part.id, tipo: 'Saída', quantidade: 10, referencia: 'Ajuste de teste' });
-  assert.equal(exit.saldoNovo, -2);
+  const beforeExit = JSON.stringify(S.store.data);
+  assert.throws(() => S.adjustStock({ pecaId: part.id, tipo: 'Saída', quantidade: 10, referencia: 'Ajuste de teste' }), /Estoque insuficiente/);
+  assert.equal(JSON.stringify(S.store.data), beforeExit);
+  const exit = S.adjustStock({ pecaId: part.id, tipo: 'Saída', quantidade: 8, referencia: 'Ajuste de teste' });
+  assert.equal(exit.saldoNovo, 0);
   assert.equal(S.lowStockParts().map((item) => item.id).includes(part.id), true);
   const movementCount = S.store.data.movimentacoes.length;
   assert.throws(() => S.adjustStock({ pecaId: part.id, tipo: 'Entrada', quantidade: 0 }), /quantidade maior que zero/);
@@ -437,9 +469,8 @@ test('store: despesa, pagamento, reabertura e exclusão', () => {
   expense = S.markDespesaPaid(expense.id);
   assert.equal(expense.status, 'Pago');
   assert.equal(expense.dataPagamento, U.todayISO());
-  const originalPaymentDate = expense.dataPagamento;
   expense = S.saveDespesa({ ...expense, dataPagamento: monthDate(-1) });
-  assert.equal(expense.dataPagamento, originalPaymentDate);
+  assert.equal(expense.dataPagamento, monthDate(-1));
   expense = S.markDespesaPaid(expense.id, false);
   assert.equal(expense.status, 'Pendente');
   assert.equal(expense.dataPagamento, '');
@@ -536,6 +567,97 @@ test('store: exportação e importação preservam os dados', () => {
   assert.deepEqual(S.reload(), snapshot);
   assert.equal(JSON.parse(localStorage.getItem(STORAGE_KEY)).data, undefined);
   assert.equal(JSON.parse(localStorage.getItem(STORAGE_KEY)).clientes.length, 1);
+});
+
+test('store: falha de gravação desfaz alterações em memória e no estoque', () => {
+  const { client, vehicle, part } = orderFixture();
+  const order = makeOrder({ client, vehicle, part });
+  const before = JSON.parse(JSON.stringify(S.store.data));
+  const rawBefore = localStorage.getItem(STORAGE_KEY);
+  const originalSetItem = localStorage.setItem;
+  const originalError = console.error;
+  localStorage.setItem = () => { throw new Error('Quota excedida'); };
+  console.error = () => {};
+  try {
+    assert.throws(() => S.saveCliente({ nome: 'Cliente não salvo' }), /Não foi possível salvar/);
+    assert.deepEqual(S.store.data, before);
+    assert.throws(() => S.adjustStock({ pecaId: part.id, tipo: 'Entrada', quantidade: 2 }), /Não foi possível salvar/);
+    assert.deepEqual(S.store.data, before);
+    assert.throws(() => S.setOrderStatus(order.id, 'Aprovada'), /Não foi possível salvar/);
+    assert.deepEqual(S.store.data, before);
+    assert.equal(localStorage.getItem(STORAGE_KEY), rawBefore);
+  } finally {
+    localStorage.setItem = originalSetItem;
+    console.error = originalError;
+  }
+});
+
+test('store: exportação continua disponível quando o armazenamento está cheio', () => {
+  makeClient({ nome: 'Cliente da cópia' });
+  const before = JSON.parse(JSON.stringify(S.store.data));
+  const originalSetItem = localStorage.setItem;
+  const originalError = console.error;
+  localStorage.setItem = () => { throw new Error('Quota excedida'); };
+  console.error = () => {};
+  try {
+    const payload = JSON.parse(S.exportPayload());
+    assert.equal(payload.format, 'fcv-backup');
+    assert.deepEqual(payload.data, before);
+    assert.deepEqual(S.store.data, before);
+  } finally {
+    localStorage.setItem = originalSetItem;
+    console.error = originalError;
+  }
+});
+
+test('store: JSON corrompido é preservado e só pode ser substituído por recuperação explícita', async () => {
+  makeClient({ nome: 'Cliente recuperado' });
+  const backup = S.exportPayload();
+  const corrupted = '{"clientes": [';
+  const originalError = console.error;
+  console.error = () => {};
+  try {
+    localStorage.setItem(STORAGE_KEY, corrupted);
+    const Corrupt = await import('../js/store.js?corrupt-storage-test');
+    assert.match(Corrupt.storageWarning(), /corrompidos/);
+    assert.throws(() => Corrupt.saveCliente({ nome: 'Não deve substituir' }), /corrompidos/);
+    assert.equal(localStorage.getItem(STORAGE_KEY), corrupted);
+    assert.equal(Corrupt.store.data.clientes.length, 0);
+    Corrupt.importPayload(backup);
+    assert.equal(Corrupt.storageWarning(), '');
+    assert.equal(Corrupt.store.data.clientes.length, 1);
+    assert.equal(JSON.parse(localStorage.getItem(STORAGE_KEY)).clientes.length, 1);
+
+    const incomplete = '{"clientes":[]}';
+    localStorage.setItem(STORAGE_KEY, incomplete);
+    const Incomplete = await import('../js/store.js?incomplete-storage-test');
+    assert.match(Incomplete.storageWarning(), /corrompidos/);
+    assert.equal(localStorage.getItem(STORAGE_KEY), incomplete);
+  } finally {
+    console.error = originalError;
+  }
+});
+
+test('store: carregar exemplo é atômico se uma gravação intermediária falhar', () => {
+  const before = JSON.parse(JSON.stringify(S.store.data));
+  const rawBefore = localStorage.getItem(STORAGE_KEY);
+  const originalSetItem = localStorage.setItem;
+  const originalError = console.error;
+  let writes = 0;
+  localStorage.setItem = (key, value) => {
+    writes += 1;
+    if (writes === 5) throw new Error('Quota excedida');
+    originalSetItem.call(localStorage, key, value);
+  };
+  console.error = () => {};
+  try {
+    assert.throws(() => S.seedDemo(), /Não foi possível salvar/);
+    assert.deepEqual(S.store.data, before);
+    assert.equal(localStorage.getItem(STORAGE_KEY), rawBefore);
+  } finally {
+    localStorage.setItem = originalSetItem;
+    console.error = originalError;
+  }
 });
 
 test('store: importação inválida é rejeitada sem substituir dados', () => {

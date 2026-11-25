@@ -63,31 +63,61 @@ function normalizeData(input) {
   return data;
 }
 
+let corruptRaw = null;
+const CORRUPT_DATA_MESSAGE = 'Os dados salvos neste navegador estão corrompidos e não serão substituídos. Restaure uma cópia de segurança válida ou use “Apagar todos os dados” em Ajuda e manual.';
+
+function cloneData(data) {
+  return JSON.parse(JSON.stringify(data));
+}
+
 function loadData() {
+  let raw = null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return emptyData();
-    return normalizeData(JSON.parse(raw));
+    raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      corruptRaw = null;
+      return emptyData();
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || !ARRAY_KEYS.every((key) => Array.isArray(parsed[key]))) {
+      throw new Error('Formato de dados inválido.');
+    }
+    corruptRaw = null;
+    return normalizeData(parsed);
   } catch (error) {
+    corruptRaw = raw;
     console.error('Não foi possível ler os dados salvos.', error);
     return emptyData();
   }
 }
 
 export const store = { data: loadData() };
+let persistedData = cloneData(store.data);
 
-export function save() {
+export function save(options = {}) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(store.data));
+    if (corruptRaw !== null && !options.replaceInvalid) throw new Error(CORRUPT_DATA_MESSAGE);
+    const serialized = JSON.stringify(store.data);
+    localStorage.setItem(STORAGE_KEY, serialized);
+    persistedData = JSON.parse(serialized);
+    corruptRaw = null;
   } catch (error) {
+    store.data = cloneData(persistedData);
     console.error(error);
-    throw new Error('Não foi possível salvar. O armazenamento do navegador pode estar cheio. Faça uma cópia de segurança e remova registros antigos.');
+    throw new Error(error.message === CORRUPT_DATA_MESSAGE
+      ? CORRUPT_DATA_MESSAGE
+      : 'Não foi possível salvar. O armazenamento do navegador pode estar cheio. Faça uma cópia de segurança e remova registros antigos.');
   }
 }
 
 export function reload() {
   store.data = loadData();
+  persistedData = cloneData(store.data);
   return store.data;
+}
+
+export function storageWarning() {
+  return corruptRaw !== null ? CORRUPT_DATA_MESSAGE : '';
 }
 
 export function isStoreEmpty() {
@@ -309,6 +339,10 @@ export function adjustStock(input) {
   const quantity = Math.abs(Number(input.quantidade) || 0);
   if (!quantity) throw new Error('Informe uma quantidade maior que zero.');
   const tipo = input.tipo === 'Saída' ? 'Saída' : 'Entrada';
+  const available = Number(peca.quantidadeEstoque) || 0;
+  if (tipo === 'Saída' && quantity > available + 1e-9) {
+    throw new Error(`Estoque insuficiente para ${peca.nome}. Disponível: ${String(Number(available.toFixed(2))).replace('.', ',')} ${peca.unidade}.`);
+  }
   const movement = addMovementInternal(peca.id, tipo === 'Entrada' ? quantity : -quantity, {
     motivo: input.motivo || (tipo === 'Entrada' ? 'Entrada manual de estoque' : 'Saída manual de estoque'),
     referencia: input.referencia || 'Lançamento manual',
@@ -379,6 +413,29 @@ function applyStockToItems(items, direction, motivo, referencia) {
   }
 }
 
+function quantitiesByPart(items) {
+  const quantities = new Map();
+  for (const item of items || []) {
+    if (item.tipo !== 'peca' || !item.pecaId) continue;
+    quantities.set(item.pecaId, (quantities.get(item.pecaId) || 0) + (Number(item.quantidade) || 0));
+  }
+  return quantities;
+}
+
+function validateOrderStock(items, old) {
+  const required = quantitiesByPart(items);
+  const restored = old?.estoqueBaixado ? quantitiesByPart(old.itens) : new Map();
+  for (const [partId, quantity] of required) {
+    const part = pecaById(partId);
+    if (!part) throw new Error('Uma das peças da ordem não foi encontrada no estoque.');
+    const available = (Number(part.quantidadeEstoque) || 0) + (restored.get(partId) || 0);
+    if (quantity > available + 1e-9) {
+      const label = part.nome || 'Peça não identificada';
+      throw new Error(`Estoque insuficiente para ${label}. Necessário: ${String(Number(quantity.toFixed(2))).replace('.', ',')}; disponível: ${String(Number(available.toFixed(2))).replace('.', ',')} ${part.unidade}.`);
+    }
+  }
+}
+
 export function peekNextOrderNumber() {
   let counter = Number(store.data.meta.nextOs) || 1;
   let candidate = `OS-${String(counter).padStart(4, '0')}`;
@@ -442,6 +499,7 @@ export function saveOrder(input) {
   const itemsChanged = old ? itemSignature(old.itens) !== itemSignature(items) : true;
   const reference = `${numero} · ${record.clienteNome}`.trim();
 
+  if (shouldDeduct && (!record.estoqueBaixado || itemsChanged)) validateOrderStock(items, old);
   if (record.estoqueBaixado && (!shouldDeduct || itemsChanged)) {
     applyStockToItems(old.itens, 1, `Estorno de estoque (O.S. ${numero})`, reference);
     record.estoqueBaixado = false;
@@ -615,7 +673,7 @@ export function saveDespesa(input) {
     data: input.data || todayISO(),
     dataVencimento: input.dataVencimento || '',
     status,
-    dataPagamento: status === 'Pago' ? (existing?.dataPagamento || input.dataPagamento || todayISO()) : '',
+    dataPagamento: status === 'Pago' ? (input.dataPagamento || existing?.dataPagamento || todayISO()) : '',
     formaPagamento: input.formaPagamento || '',
     observacoes: String(input.observacoes || '').trim(),
     criadoEm: existing?.criadoEm || nowISO()
@@ -721,15 +779,18 @@ export function sidebarCounts() {
 }
 
 export function exportPayload() {
-  const payload = {
+  store.data.meta.lastBackupAt = nowISO();
+  try {
+    save();
+  } catch {
+    // O download precisa continuar mesmo quando o navegador não consegue gravar.
+  }
+  return JSON.stringify({
     app: 'Franlin Car Veículos',
     format: 'fcv-backup',
     exportedAt: nowISO(),
     data: store.data
-  };
-  store.data.meta.lastBackupAt = nowISO();
-  save();
-  return JSON.stringify(payload, null, 2);
+  }, null, 2);
 }
 
 export function importPayload(rawText) {
@@ -745,13 +806,13 @@ export function importPayload(rawText) {
     throw new Error('O arquivo não contém dados do sistema Franlin Car Veículos.');
   }
   store.data = normalizeData(data);
-  save();
+  save({ replaceInvalid: true });
   return store.data;
 }
 
 export function clearAll() {
   store.data = emptyData();
-  save();
+  save({ replaceInvalid: true });
 }
 
 function daysFromNow(days) {
@@ -760,10 +821,7 @@ function daysFromNow(days) {
   return localDateISO(date);
 }
 
-export function seedDemo() {
-  if (!isStoreEmpty()) {
-    throw new Error('Os dados de exemplo só podem ser carregados quando o sistema ainda está vazio.');
-  }
+function populateDemo() {
   clearAll();
 
   const maria = saveCliente({
@@ -875,4 +933,36 @@ export function seedDemo() {
 
   store.data.meta.demo = true;
   save();
+}
+
+export function seedDemo() {
+  if (!isStoreEmpty()) {
+    throw new Error('Os dados de exemplo só podem ser carregados quando o sistema ainda está vazio.');
+  }
+  const previousData = store.data;
+  const previousPersisted = persistedData;
+  const previousCorruptRaw = corruptRaw;
+  let previousRaw = null;
+  let canRestoreRaw = true;
+  try {
+    previousRaw = localStorage.getItem(STORAGE_KEY);
+  } catch {
+    canRestoreRaw = false;
+  }
+  try {
+    populateDemo();
+  } catch (error) {
+    store.data = previousData;
+    persistedData = previousPersisted;
+    corruptRaw = previousCorruptRaw;
+    if (canRestoreRaw) {
+      try {
+        if (previousRaw === null) localStorage.removeItem(STORAGE_KEY);
+        else localStorage.setItem(STORAGE_KEY, previousRaw);
+      } catch (restoreError) {
+        console.error('Não foi possível restaurar o armazenamento anterior.', restoreError);
+      }
+    }
+    throw error;
+  }
 }

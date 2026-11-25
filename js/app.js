@@ -6,7 +6,7 @@ import {
   vehicleTitle, fileStamp, nowISO, round2, isInMonth
 } from './util.js';
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.1';
 const STORAGE_KEY = 'fcv.store.v1';
 const root = document.getElementById('app');
 
@@ -131,10 +131,16 @@ function render() {
   const route = parseRoute();
   const routeKey = `${route.path}${route.query.toString() ? `?${route.query.toString()}` : ''}`;
   const content = contentForPath(route.path, route.query);
+  const storageWarning = S.storageWarning();
   root.innerHTML = U.shell({
     path: route.path,
     counts: S.sidebarCounts(),
-    content,
+    content: storageWarning ? `
+      <div class="notice notice-warning" role="alert">
+        <span class="notice-icon">${icon('alerta')}</span>
+        <div><strong>Dados salvos precisam de atenção</strong><p>${esc(storageWarning)}</p></div>
+        <a class="btn btn-small btn-warning" href="#/ajuda">Ver opções de recuperação</a>
+      </div>${content}` : content,
     fontLabel: FONT_LABELS[fontScale]
   });
   document.title = `${titleForPath(route.path)} · Franlin Car Veículos`;
@@ -1344,7 +1350,7 @@ function formValues(form) {
 
 function openClientModal(id = '') {
   const client = id ? S.clienteById(id) : null;
-  const formId = `form-cliente-${id || 'novo'}`;
+  const formId = 'form-cliente';
   U.openModal({
     title: client ? 'Editar cliente' : 'Cadastrar cliente',
     subtitle: 'O telefone com DDD será usado para enviar mensagens pelo WhatsApp.',
@@ -1374,7 +1380,7 @@ function openVehicleModal(id = '', clientId = '', context = '') {
     return;
   }
   if (context) vehicleReturnClient = context;
-  const formId = `form-veiculo-${id || 'novo'}`;
+  const formId = 'form-veiculo';
   U.openModal({
     title: vehicle ? 'Editar veículo' : 'Cadastrar veículo',
     subtitle: 'Informe a placa e os dados que aparecerão na ordem de serviço.',
@@ -1418,7 +1424,7 @@ function openVehiclesModal(clientId) {
 
 function openSupplierModal(id = '') {
   const supplier = id ? S.fornecedorById(id) : null;
-  const formId = `form-fornecedor-${id || 'novo'}`;
+  const formId = 'form-fornecedor';
   U.openModal({
     title: supplier ? 'Editar fornecedor' : 'Cadastrar fornecedor',
     subtitle: 'Use estes dados nas compras e no cadastro das peças.',
@@ -1443,7 +1449,7 @@ function openPartModal(id = '', returnContext = '') {
   const suppliers = sortBy(S.store.data.fornecedores, (supplier) => supplier.nome);
   const supplierName = part?.fornecedorNome || S.fornecedorById(part?.fornecedorId)?.nome || '';
   if (returnContext) vehicleReturnClient = returnContext;
-  const formId = `form-peca-${id || 'nova'}`;
+  const formId = 'form-peca';
   U.openModal({
     title: part ? 'Editar peça' : 'Cadastrar peça',
     subtitle: 'O estoque é controlado pelas movimentações. Para corrigir a quantidade, use Entrada / saída.',
@@ -1523,7 +1529,7 @@ async function openMovementModal(partId = '') {
 
 function openExpenseModal(id = '') {
   const expense = id ? S.despesaById(id) : null;
-  const formId = `form-despesa-${id || 'nova'}`;
+  const formId = 'form-despesa';
   U.openModal({
     title: expense ? 'Editar despesa' : 'Registrar despesa',
     subtitle: 'Despesas pagas entram no caixa pela data de pagamento.',
@@ -1578,7 +1584,7 @@ function openPurchaseMeta(id) {
   const purchase = S.compraById(id);
   if (!purchase) return;
   const suppliers = sortBy(S.store.data.fornecedores, (supplier) => supplier.nome);
-  const formId = `form-compra-${id}`;
+  const formId = 'form-compra';
   U.openModal({
     title: 'Editar dados da compra',
     subtitle: 'Os itens e o estoque não são alterados aqui.',
@@ -1607,7 +1613,7 @@ function openPurchaseItem(index = null) {
   const parts = sortBy(S.store.data.pecas, (part) => part.nome);
   const selected = item?.pecaId || '__nova__';
   const isNew = selected === '__nova__';
-  const formId = `form-item-compra-${index ?? 'novo'}`;
+  const formId = 'form-item-compra';
   U.openModal({
     title: item ? 'Editar peça da compra' : 'Adicionar peça à compra',
     subtitle: 'Escolha uma peça já cadastrada ou informe uma peça nova.',
@@ -1658,7 +1664,7 @@ function openOsPartModal(index = null, preferredPartId = '') {
   }
   const selected = item?.pecaId || preferredPartId || parts[0].id;
   const initialPart = S.pecaById(selected);
-  const formId = `form-peca-os-${index ?? 'novo'}`;
+  const formId = 'form-peca-os';
   U.openModal({
     title: item ? 'Editar peça' : 'Adicionar peça à O.S.',
     subtitle: 'A quantidade será conferida com o estoque antes de aprovar o serviço.',
@@ -1696,7 +1702,7 @@ function openOsPartModal(index = null, preferredPartId = '') {
 function openOsLaborModal(index = null) {
   const draft = ensureOsDraft();
   const item = index === null ? null : draft.itens[index];
-  const formId = `form-mao-obra-os-${index ?? 'novo'}`;
+  const formId = 'form-mao-obra-os';
   U.openModal({
     title: item ? 'Editar mão de obra' : 'Adicionar mão de obra',
     subtitle: 'Descreva o serviço e informe o valor cobrado.',

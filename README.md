@@ -1,6 +1,6 @@
 # Franlin Car Veículos
 
-Sistema estático de gestão para oficina, em português brasileiro, sem login e sem dependências externas. A versão atual é **1.0.0**.
+Sistema estático de gestão para oficina, em português brasileiro, sem login e sem dependências externas. A versão atual é **1.0.1**.
 
 ## Recursos
 
