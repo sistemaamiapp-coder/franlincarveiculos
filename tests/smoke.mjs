@@ -171,6 +171,36 @@ test('ui: formulários usam IDs fixos e não inserem IDs importados no HTML', ()
   }
 });
 
+test('ui: manual fica no final do menu e da página de ajuda', () => {
+  const shell = UI.shell({ path: '/ajuda', content: '<p>Conteúdo</p>' });
+  assert.doesNotMatch(shell, /btn-help-top/);
+  assert.ok(shell.indexOf('nav-help') > shell.lastIndexOf('nav-group'));
+
+  const source = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+  const helpView = source.slice(source.indexOf('function helpView('), source.indexOf('async function getManual()'));
+  assert.ok(helpView.indexOf('backup-card') < helpView.indexOf('manual-content'));
+  assert.doesNotMatch(helpView, /data-action="printManual"/);
+  assert.ok(source.indexOf('data-action="printManual"') > source.indexOf('class="manual-toolbar"'));
+  assert.match(source, /route\.path\.startsWith\('\/ajuda'\)\) loadManualIntoPage\(\)/);
+  assert.doesNotMatch(source, /setTimeout\(loadManualIntoPage/);
+});
+
+test('interface: tema claro e versões sincronizadas', () => {
+  const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  assert.match(css, /color-scheme:\s*light/);
+  assert.doesNotMatch(css, /color-scheme:\s*dark|interface escura|--bg:\s*#0b0d11/);
+  assert.match(css, /--text:\s*#17202a/);
+
+  const app = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  const manual = readFileSync(new URL('../MANUAL.md', import.meta.url), 'utf8');
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  assert.equal(app.match(/APP_VERSION = '([^']+)'/)[1], pkg.version);
+  assert.ok(manual.includes(`versão **${pkg.version}**`));
+  assert.ok(manual.includes(`Versão ${pkg.version}`));
+  assert.ok(readme.includes(`versão atual é **${pkg.version}**`));
+});
+
 test('util: normalização e validação de WhatsApp', () => {
   assert.equal(U.onlyDigits('(27) 99999-1010'), '27999991010');
   assert.equal(U.whatsAppNumber('(27) 99999-1010'), '5527999991010');

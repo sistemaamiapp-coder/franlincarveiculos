@@ -1,6 +1,6 @@
 # Manual do Franlin Car Veículos
 
-Bem-vindo ao manual do **Franlin Car Veículos**, versão **1.0.1**. Este guia explica, passo a passo, como usar o sistema da oficina.
+Bem-vindo ao manual do **Franlin Car Veículos**, versão **1.0.2**. Este guia explica, passo a passo, como usar o sistema da oficina.
 
 O sistema funciona em um navegador de internet, sem login. Os registros ficam salvos somente no navegador e no dispositivo em que foram digitados. Eles não são sincronizados entre computadores, celulares ou pessoas. Abas abertas no mesmo navegador, perfil e endereço podem receber as alterações salvas umas das outras, como explicado na seção 15.
 
@@ -54,7 +54,7 @@ Se você estiver usando uma prévia local, o endereço normalmente será `http:/
 - **Fornecedores** guarda os contatos de compras.
 - **Despesas** registra os gastos da oficina.
 - **Contas e caixa** mostra recebimentos, pagamentos e pendências.
-- **Ajuda e manual** abre este manual e as ferramentas de cópia.
+- **Ajuda e manual**, no final do menu, abre as ferramentas de cópia e, depois delas, o manual completo.
 
 Os endereços das telas usam `#`, por exemplo, `#/ordens`. Isso é normal. Compartilhar o endereço de uma tela não compartilha os dados: cada navegador tem seus próprios registros.
 
@@ -66,6 +66,19 @@ Os endereços das telas usam `#`, por exemplo, `#/ordens`. Isso é normal. Compa
 4. O sistema mostra **Normal**, **Grande** ou **Maior**.
 
 Use o tamanho que facilitar a leitura. O navegador também pode ampliar a página com `Ctrl` e `+`, ou com o gesto de zoom do celular.
+
+### Tema claro e localização do manual
+
+O sistema usa **tema claro**, com fundos claros, texto escuro e cores de destaque para facilitar a leitura. Os documentos impressos continuam com fundo branco.
+
+Para consultar o manual:
+
+1. Abra **Ajuda e manual**, que fica no final do menu de tópicos.
+2. Na página **Ajuda**, primeiro aparecem as ferramentas de cópia de segurança.
+3. Role até o final da página para encontrar o **Manual do usuário**, seu índice e os botões **Voltar ao início** e **Imprimir manual**.
+4. Use o botão **Como usar**, disponível em algumas telas, para abrir diretamente a seção correspondente do manual.
+
+O manual não tem um atalho no topo da página. As ferramentas de ajuda e de segurança aparecem primeiro.
 
 ### Como preencher valores e quantidades
 
@@ -303,10 +316,11 @@ O documento impresso reúne cliente, veículo, problema, peças e serviços, tot
 ### Imprimir este manual
 
 1. Abra **Ajuda e manual**.
-2. Aguarde o manual carregar.
-3. Clique em **Imprimir manual**.
-4. Escolha uma impressora ou **Salvar como PDF**.
-5. Confira a visualização e salve ou imprima.
+2. Role até o final da página, depois das ferramentas de cópia.
+3. Aguarde o manual carregar.
+4. Clique em **Imprimir manual**, ao lado de **Voltar ao início**.
+5. Escolha uma impressora ou **Salvar como PDF**.
+6. Confira a visualização e salve ou imprima.
 
 ## 8. Peças, estoque e movimentações {#estoque}
 
@@ -774,4 +788,4 @@ Não documente recursos que não existem, como sincronização em nuvem, acesso 
 
 ---
 
-Franlin Car Veículos · Manual do usuário · Versão 1.0.1
+Franlin Car Veículos · Manual do usuário · Versão 1.0.2

@@ -1,6 +1,6 @@
 # Franlin Car Veículos
 
-Sistema estático de gestão para oficina, em português brasileiro, sem login e sem dependências externas. A versão atual é **1.0.1**.
+Sistema estático de gestão para oficina, em português brasileiro, sem login e sem dependências externas. A versão atual é **1.0.2**.
 
 ## Recursos
 
@@ -12,7 +12,8 @@ Sistema estático de gestão para oficina, em português brasileiro, sem login e
 - Mensagens preparadas para confirmação e envio manual no WhatsApp.
 - Impressão da O.S. e salvamento em PDF pelo navegador.
 - Cópia de segurança JSON, restauração, limpeza e dados de exemplo.
-- Manual completo incorporado ao sistema.
+- Interface em tema claro, com controles grandes e três tamanhos de letra.
+- Manual completo incorporado ao sistema, após as ferramentas de ajuda.
 
 ## Endereço de publicação
 
@@ -48,7 +49,7 @@ Use **Ajuda e manual > Baixar cópia** com frequência. O JSON exportado contém
 
 ## Manual
 
-O manual canônico está em [`MANUAL.md`](MANUAL.md) e é carregado dentro do sistema em **Ajuda e manual**. Toda mudança funcional, de interface ou de dados deve atualizar esse arquivo na mesma alteração.
+O manual canônico está em [`MANUAL.md`](MANUAL.md) e é carregado dentro do sistema em **Ajuda e manual**. O acesso fica no final do menu e o conteúdo completo aparece depois das ferramentas de cópia de segurança, não no início da página. Toda mudança funcional, de interface ou de dados deve atualizar esse arquivo na mesma alteração.
 
 ## Estrutura
 

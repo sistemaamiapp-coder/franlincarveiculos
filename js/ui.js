@@ -150,7 +150,6 @@ export function shell({ path, counts = {}, content, fontLabel = 'Normal' }) {
               <span class="font-current" aria-live="polite">${escapeHtml(fontLabel)}</span>
               <button type="button" class="font-btn" data-action="fontUp" aria-label="Aumentar letra">A+</button>
             </div>
-            <a class="btn btn-ghost btn-help-top" href="#/ajuda">${icon('ajuda')}<span>Manual</span></a>
           </div>
         </header>
         <main class="content" id="conteudo" tabindex="-1">

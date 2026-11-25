@@ -6,7 +6,7 @@ import {
   vehicleTitle, fileStamp, nowISO, round2, isInMonth
 } from './util.js';
 
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
 const STORAGE_KEY = 'fcv.store.v1';
 const root = document.getElementById('app');
 
@@ -162,7 +162,7 @@ function render() {
     history.replaceState(null, '', `${location.pathname}${location.search}#/estoque`);
     setTimeout(() => openMovementModal(id), 40);
   }
-  if (route.path === '/ajuda') setTimeout(loadManualIntoPage, 0);
+  if (route.path.startsWith('/ajuda')) loadManualIntoPage();
 }
 
 function quickAction({ iconName, title, text, href = '', action = '', id = '', primary = false }) {
@@ -1265,9 +1265,8 @@ function helpView(path) {
   return `
     <div class="page-wrap help-page">
       ${U.pageHead({
-        title: 'Ajuda e manual',
-        subtitle: 'Aprenda a usar cada parte do sistema. O manual é atualizado junto com as mudanças.',
-        actions: `<button type="button" class="btn btn-secondary" data-action="printManual">${icon('imprimir')}Imprimir manual</button>`
+        title: 'Ajuda',
+        subtitle: 'Ferramentas e orientações de segurança. O manual completo fica no final desta página.'
       })}
       <section class="backup-card">
         <div class="backup-copy">
@@ -1314,7 +1313,10 @@ async function loadManualIntoPage() {
     container.innerHTML = `
       <header class="manual-toolbar">
         <div><span class="eyebrow">Manual do usuário</span><p>Encontre a tarefa no índice ou leia na ordem.</p></div>
-        <button type="button" class="btn btn-small btn-secondary" data-action="manualTop">${icon('avancar')}Voltar ao início</button>
+        <div class="manual-toolbar-actions">
+          <button type="button" class="btn btn-small btn-secondary" data-action="manualTop">${icon('avancar')}Voltar ao início</button>
+          <button type="button" class="btn btn-small btn-secondary" data-action="printManual">${icon('imprimir')}Imprimir manual</button>
+        </div>
       </header>
       <div class="manual-layout">
         <nav class="manual-toc" aria-label="Índice do manual">
