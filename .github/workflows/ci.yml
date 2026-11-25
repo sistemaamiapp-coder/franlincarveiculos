@@ -1,0 +1,97 @@
+name: CI e GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Executar testes
+        run: npm test
+
+      - name: Verificar atualização do manual
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          initial_tree=false
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            merge_base=$(git merge-base "$BASE_SHA" HEAD)
+            range="${merge_base}...HEAD"
+          elif [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]] || ! git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+            initial_tree=true
+          else
+            range="${BEFORE_SHA}..${AFTER_SHA}"
+          fi
+
+          if [[ "$initial_tree" == true ]]; then
+            mapfile -t changed_files < <(git ls-tree -r --name-only HEAD)
+          else
+            mapfile -t changed_files < <(git diff --name-only --diff-filter=ACDMRT "$range")
+          fi
+          functional_files=()
+          manual_changed=false
+
+          for file in "${changed_files[@]}"; do
+            case "$file" in
+              index.html|styles.css|js/*|assets/*)
+                functional_files+=("$file")
+                ;;
+              MANUAL.md)
+                manual_changed=true
+                ;;
+            esac
+          done
+
+          if (( ${#functional_files[@]} > 0 )); then
+            if [[ "$manual_changed" != true || ! -f MANUAL.md ]]; then
+              echo "::error file=MANUAL.md::Alterações em index.html, styles.css, js/* ou assets/* exigem atualização de MANUAL.md na mesma alteração."
+              exit 1
+            fi
+          fi
+
+          echo "Manual sincronizado com os arquivos funcionais."
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v6
+
+      - name: Enviar artefato do Pages
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: .
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicar no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0d11">
+  <meta name="description" content="Sistema de gestão da oficina Franlin Car Veículos: ordens de serviço, estoque, clientes e financeiro.">
+  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <title>Franlin Car Veículos — Gestão de Oficina</title>
+</head>
+<body>
+  <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
+
+  <div id="app" class="app-root">
+    <main class="initial-state" id="conteudo" tabindex="-1" role="status" aria-live="polite">
+      <div class="initial-card">
+        <span class="initial-mark" aria-hidden="true">FC</span>
+        <div class="initial-copy">
+          <strong>Franlin Car Veículos</strong>
+          <span>Carregando a gestão da oficina</span>
+        </div>
+        <span class="initial-spinner" aria-hidden="true"></span>
+      </div>
+    </main>
+  </div>
+
+  <div id="modal-root"></div>
+  <div id="toast-root" aria-live="polite" aria-atomic="false"></div>
+
+  <noscript>
+    <div class="noscript-message" role="alert">
+      <strong>O sistema precisa do JavaScript ativado.</strong>
+      <span>Ative o JavaScript neste navegador para usar os cadastros, as ordens de serviço e o financeiro.</span>
+    </div>
+  </noscript>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
