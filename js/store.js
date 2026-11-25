@@ -65,23 +65,38 @@ function normalizeData(input) {
 
 let corruptRaw = null;
 const CORRUPT_DATA_MESSAGE = 'Os dados salvos neste navegador estão corrompidos e não serão substituídos. Restaure uma cópia de segurança válida ou use “Apagar todos os dados” em Ajuda e manual.';
+const browserStorage = {
+  getItem: (key) => globalThis.localStorage?.getItem(key) ?? null,
+  setItem: (key, value) => globalThis.localStorage?.setItem(key, value),
+  removeItem: (key) => globalThis.localStorage?.removeItem(key)
+};
+let storageAdapter = browserStorage;
+let changeListener = null;
+let writeGuard = null;
 
 function cloneData(data) {
   return JSON.parse(JSON.stringify(data));
 }
 
+export function createEmptyData() {
+  return emptyData();
+}
+
+export function isValidData(input) {
+  return Boolean(input && typeof input === 'object' && !Array.isArray(input)
+    && ARRAY_KEYS.every((key) => Array.isArray(input[key])));
+}
+
 function loadData() {
   let raw = null;
   try {
-    raw = localStorage.getItem(STORAGE_KEY);
+    raw = storageAdapter.getItem(STORAGE_KEY);
     if (!raw) {
       corruptRaw = null;
       return emptyData();
     }
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || !ARRAY_KEYS.every((key) => Array.isArray(parsed[key]))) {
-      throw new Error('Formato de dados inválido.');
-    }
+    if (!isValidData(parsed)) throw new Error('Formato de dados inválido.');
     corruptRaw = null;
     return normalizeData(parsed);
   } catch (error) {
@@ -94,11 +109,50 @@ function loadData() {
 export const store = { data: loadData() };
 let persistedData = cloneData(store.data);
 
+export function setStorageAdapter(adapter, { reload: shouldReload = true } = {}) {
+  if (!adapter || typeof adapter.getItem !== 'function' || typeof adapter.setItem !== 'function') {
+    throw new Error('Armazenamento local inválido.');
+  }
+  storageAdapter = adapter;
+  if (shouldReload) reload();
+}
+
+export function useLocalStorage() {
+  storageAdapter = browserStorage;
+  return reload();
+}
+
+export function subscribe(listener) {
+  changeListener = listener;
+  return () => {
+    if (changeListener === listener) changeListener = null;
+  };
+}
+
+export function setWriteGuard(guard) {
+  writeGuard = typeof guard === 'function' ? guard : null;
+}
+
+function notifyChange() {
+  try {
+    changeListener?.(cloneData(store.data));
+  } catch (error) {
+    console.error('Não foi possível preparar a sincronização.', error);
+  }
+}
+
 export function save(options = {}) {
+  if (!options.force && writeGuard) {
+    const message = writeGuard();
+    if (message) {
+      store.data = cloneData(persistedData);
+      throw new Error(message);
+    }
+  }
   try {
     if (corruptRaw !== null && !options.replaceInvalid) throw new Error(CORRUPT_DATA_MESSAGE);
     const serialized = JSON.stringify(store.data);
-    localStorage.setItem(STORAGE_KEY, serialized);
+    storageAdapter.setItem(STORAGE_KEY, serialized);
     persistedData = JSON.parse(serialized);
     corruptRaw = null;
   } catch (error) {
@@ -108,6 +162,24 @@ export function save(options = {}) {
       ? CORRUPT_DATA_MESSAGE
       : 'Não foi possível salvar. O armazenamento do navegador pode estar cheio. Faça uma cópia de segurança e remova registros antigos.');
   }
+  if (!options.silent) notifyChange();
+}
+
+export function applyRemoteData(input, { notify = false } = {}) {
+  if (!isValidData(input)) throw new Error('Os dados recebidos da nuvem são inválidos.');
+  const next = normalizeData(input);
+  const serialized = JSON.stringify(next);
+  try {
+    storageAdapter.setItem(STORAGE_KEY, serialized);
+  } catch (error) {
+    console.error(error);
+    throw new Error('Não foi possível guardar o cache local dos dados da nuvem.');
+  }
+  store.data = next;
+  persistedData = JSON.parse(serialized);
+  corruptRaw = null;
+  if (notify) notifyChange();
+  return store.data;
 }
 
 export function reload() {
@@ -158,20 +230,22 @@ export function despesaById(id) {
 
 export function clientePhone(ordem) {
   const cliente = ordem?.clienteId ? clienteById(ordem.clienteId) : null;
-  return cliente?.telefone || ordem?.clienteTelefone || '';
+  return ordem?.clienteTelefone || cliente?.telefone || '';
 }
 
 export function saveCliente(input) {
   const data = store.data;
   const nome = String(input.nome || '').trim();
+  const telefone = String(input.telefone || '').trim();
   if (!nome) throw new Error('Informe o nome do cliente.');
+  if (!telefone) throw new Error('Informe o telefone do cliente.');
   const existing = input.id ? clienteById(input.id) : null;
   const record = {
     id: existing?.id || uid('cli'),
     nome,
     tipo: input.tipo || 'Pessoa Física',
     cpfCnpj: String(input.cpfCnpj || '').trim(),
-    telefone: String(input.telefone || '').trim(),
+    telefone,
     email: String(input.email || '').trim(),
     endereco: String(input.endereco || '').trim(),
     cidade: String(input.cidade || '').trim(),
@@ -493,11 +567,9 @@ export function saveOrder(input) {
     atualizadoEm: nowISO()
   };
 
-  if (!record.clienteNome) throw new Error('Escolha o cliente da ordem de serviço.');
-
   const shouldDeduct = status === 'Aprovada' || status === 'Faturada';
   const itemsChanged = old ? itemSignature(old.itens) !== itemSignature(items) : true;
-  const reference = `${numero} · ${record.clienteNome}`.trim();
+  const reference = `${numero} · ${record.clienteNome || 'Cliente não informado'}`.trim();
 
   if (shouldDeduct && (!record.estoqueBaixado || itemsChanged)) validateOrderStock(items, old);
   if (record.estoqueBaixado && (!shouldDeduct || itemsChanged)) {
@@ -538,7 +610,7 @@ export function deleteOrder(id) {
   const order = ordemById(id);
   if (!order) return;
   if (order.estoqueBaixado) {
-    applyStockToItems(order.itens, 1, `Estorno de estoque (O.S. ${order.numero})`, `${order.numero} · ${order.clienteNome}`);
+    applyStockToItems(order.itens, 1, `Estorno de estoque (O.S. ${order.numero})`, `${order.numero} · ${order.clienteNome || 'Cliente não informado'}`);
   }
   store.data.ordens = store.data.ordens.filter((item) => item.id !== id);
   save();
@@ -945,7 +1017,7 @@ export function seedDemo() {
   let previousRaw = null;
   let canRestoreRaw = true;
   try {
-    previousRaw = localStorage.getItem(STORAGE_KEY);
+    previousRaw = storageAdapter.getItem(STORAGE_KEY);
   } catch {
     canRestoreRaw = false;
   }
@@ -957,8 +1029,8 @@ export function seedDemo() {
     corruptRaw = previousCorruptRaw;
     if (canRestoreRaw) {
       try {
-        if (previousRaw === null) localStorage.removeItem(STORAGE_KEY);
-        else localStorage.setItem(STORAGE_KEY, previousRaw);
+        if (previousRaw === null) storageAdapter.removeItem(STORAGE_KEY);
+        else storageAdapter.setItem(STORAGE_KEY, previousRaw);
       } catch (restoreError) {
         console.error('Não foi possível restaurar o armazenamento anterior.', restoreError);
       }

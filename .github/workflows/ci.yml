@@ -58,7 +58,7 @@ jobs:
 
           for file in "${changed_files[@]}"; do
             case "$file" in
-              index.html|styles.css|js/*|assets/*)
+              index.html|styles.css|js/*|assets/*|sw.js|supabase/*.sql)
                 functional_files+=("$file")
                 ;;
               MANUAL.md)
@@ -69,12 +69,26 @@ jobs:
 
           if (( ${#functional_files[@]} > 0 )); then
             if [[ "$manual_changed" != true || ! -f MANUAL.md ]]; then
-              echo "::error file=MANUAL.md::Alterações em index.html, styles.css, js/* ou assets/* exigem atualização de MANUAL.md na mesma alteração."
+              echo "::error file=MANUAL.md::Alterações funcionais, inclusive sw.js e supabase/*.sql, exigem atualização de MANUAL.md na mesma alteração."
               exit 1
             fi
           fi
 
           echo "Manual sincronizado com os arquivos funcionais."
+
+      - name: Gerar configuração pública do Supabase
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$SUPABASE_URL" || -z "$SUPABASE_ANON_KEY" ]]; then
+            printf '%s\n' 'Secrets SUPABASE_URL e SUPABASE_ANON_KEY não configurados; o site abrirá sem conexão com a nuvem.'
+            printf '%s\n' '{"supabaseUrl":"","supabaseAnonKey":""}' > config.json
+            exit 0
+          fi
+          node -e "const fs=require('node:fs'); const value={supabaseUrl:process.env.SUPABASE_URL,supabaseAnonKey:process.env.SUPABASE_ANON_KEY}; const url=new URL(value.supabaseUrl); if(url.protocol!=='https:') process.exit(1); fs.writeFileSync('config.json', JSON.stringify(value,null,2)+'\n');"
 
       - name: Configurar GitHub Pages
         uses: actions/configure-pages@v6

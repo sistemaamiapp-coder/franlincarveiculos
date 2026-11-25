@@ -1,11 +1,11 @@
 {
   "name": "franlincarveiculos",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "Sistema estático de gestão da Franlin Car Veículos",
   "scripts": {
-    "test": "node tests/smoke.mjs"
+    "test": "node tests/smoke.mjs && node tests/auth.mjs && node tests/sync.mjs && node tests/schema.mjs"
   },
   "engines": {
     "node": ">=20"

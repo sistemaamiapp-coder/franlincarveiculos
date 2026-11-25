@@ -1,8 +1,8 @@
 # Manual do Franlin Car Veículos
 
-Bem-vindo ao manual do **Franlin Car Veículos**, versão **1.0.2**. Este guia explica, passo a passo, como usar o sistema da oficina.
+Bem-vindo ao manual do **Franlin Car Veículos**, versão **1.1.0**. Este guia explica, passo a passo, como usar o sistema da oficina.
 
-O sistema funciona em um navegador de internet, sem login. Os registros ficam salvos somente no navegador e no dispositivo em que foram digitados. Eles não são sincronizados entre computadores, celulares ou pessoas. Abas abertas no mesmo navegador, perfil e endereço podem receber as alterações salvas umas das outras, como explicado na seção 15.
+O sistema funciona em um navegador de internet com login por e-mail e senha. Os registros da sua conta ficam salvos na nuvem e também em cache no dispositivo, permitindo consultar e trabalhar sem conexão depois que o sistema já foi carregado. Ao voltar a internet, as alterações pendentes são enviadas automaticamente. Contas diferentes têm dados separados.
 
 > **Atenção:** faça uma cópia de segurança toda semana e antes de apagar dados, restaurar uma cópia, limpar o navegador ou trocar de dispositivo. O arquivo de cópia contém dados pessoais e financeiros.
 
@@ -10,22 +10,25 @@ O sistema funciona em um navegador de internet, sem login. Os registros ficam sa
 
 ### O que o sistema faz
 
-- Cadastra clientes, veículos, fornecedores e peças.
-- Monta ordens de serviço, chamadas de **O.S.**, com peças, mão de obra, desconto e pagamento.
+- Registra ordens de serviço, chamadas de **O.S.**, com peças, mão de obra, desconto e pagamento.
+- Permite abrir uma O.S. sem cliente e sem veículo, ou informar dados simples diretamente nela.
+- Cadastra clientes, veículos, fornecedores e peças quando você desejar reutilizar esses dados.
 - Acompanha os status Orçamento, Aprovada, Faturada e Cancelada.
 - Controla entradas, saídas e estornos de estoque.
 - Registra compras, despesas, contas a receber e contas a pagar.
 - Prepara mensagens para o WhatsApp e documentos para impressão ou PDF.
 - Exporta e restaura uma cópia de segurança em arquivo JSON.
+- Sincroniza os dados da mesma conta entre computadores e celulares, com proteção contra conflitos.
 
 ### Sequência recomendada para começar
 
-1. Abra o endereço do sistema e leia os avisos de segurança.
-2. Cadastre os fornecedores, se for usá-los nas peças e compras.
-3. Cadastre as peças e informe o estoque inicial verdadeiro.
-4. Cadastre o cliente e o veículo.
-5. Abra uma O.S. e monte o orçamento.
-6. Envie o orçamento pelo WhatsApp somente depois de conferir a mensagem.
+1. Abra o endereço do sistema, entre na sua conta ou crie uma conta e leia os avisos de segurança.
+2. Se aparecer a escolha de migração, siga a seção 2 para não perder os dados da versão anterior.
+3. Abra **Ordens de serviço** e clique em **Nova O.S.**. Cliente e veículo são opcionais.
+3. Descreva o problema e adicione peças ou mão de obra para montar o orçamento.
+4. Cadastre fornecedores e peças se for controlar o estoque e as compras. Informe o estoque inicial verdadeiro.
+5. Se quiser reutilizar dados, cadastre clientes e veículos em **Clientes e veículos**. Isso não é obrigatório para a O.S.
+6. Envie o orçamento pelo WhatsApp somente depois de conferir a mensagem e se houver telefone com DDD.
 7. Aprove, fatura, receba e acompanhe o estoque e o caixa.
 
 Se quiser apenas conhecer as telas, use os dados de exemplo explicados na seção 14. Não use os dados de exemplo para uma oficina real.
@@ -36,19 +39,61 @@ Se quiser apenas conhecer as telas, use os dados de exemplo explicados na seçã
 
 1. Abra um navegador atualizado, como Chrome, Edge ou Firefox.
 2. Acesse o endereço público do sistema ou o endereço da prévia local.
-3. Não é necessário criar conta, digitar senha ou fazer cadastro.
-4. A primeira tela será o **Painel**.
+3. Na tela **Entrar na sua conta**, digite seu e-mail e sua senha.
+4. Se for o primeiro acesso, clique em **Criar conta**, informe o e-mail, a senha e a repetição da senha. A senha precisa ter pelo menos 6 caracteres.
+5. Se o Supabase enviar um link de confirmação, abra o link no e-mail e depois volte ao sistema para entrar.
+6. Depois de entrar, a primeira tela será **Ordens de serviço**, o recurso principal do sistema. O **Painel** continua disponível no menu para consultar o resumo.
 
-Se você estiver usando uma prévia local, o endereço normalmente será `http://127.0.0.1:8080`. Abra o sistema por um servidor local, não clicando diretamente no arquivo `index.html`.
+Se aparecer **Esqueci minha senha**, informe o e-mail da conta e clique em **Enviar link de recuperação**. O link permite definir uma nova senha. Confira também a caixa de spam. O sistema não mostra nem reenvia sua senha atual.
+
+Marque **Manter conectado neste computador** somente em um dispositivo próprio e protegido. Sem essa opção, a sessão fica associada à aba e pode terminar ao fechar o navegador. Use **Sair** no topo ou em **Ajuda e manual** quando terminar, especialmente em computador compartilhado.
+
+Se você estiver usando uma prévia local, o endereço normalmente será `http://127.0.0.1:8080`. Abra o sistema por um servidor local, não clicando diretamente no arquivo `index.html`. A prévia também precisa da configuração pública do Supabase para acessar a nuvem.
+
+### Como migrar dados da versão anterior
+
+Na primeira entrada, o sistema procura dados antigos na chave `fcv.store.v1` deste navegador. Se encontrar registros e a conta ainda não tiver uma migração concluída, aparece **Escolha quais dados usar**. Nenhuma opção é aplicada automaticamente.
+
+- **Usar dados da nuvem:** mantém o que já está na conta e não envia os dados locais antigos. Use esta opção se a nuvem já tiver as informações corretas.
+- **Usar dados deste computador:** envia os dados locais para a conta. Se já houver dados na nuvem, a versão anterior da nuvem é arquivada no servidor antes da substituição.
+
+Depois da escolha, aguarde o status **Sincronizado**. Se estiver sem internet, a opção local fica guardada como pendente e será enviada quando a conexão voltar. O arquivo de segurança antigo não é apagado pelo sistema.
+
+### Como acompanhar a sincronização
+
+O selo no topo e no menu mostra a situação:
+
+- **Sincronizado:** os dados exibidos foram confirmados pela nuvem.
+- **Sincronizando:** uma operação está sendo enviada ou recebida.
+- **Offline:** há alterações guardadas neste dispositivo aguardando conexão.
+- **Falha na sincronização:** houve erro de rede ou do servidor; use **Tentar novamente**.
+- **Sessão expirada:** o acesso deixou de ser válido; o sistema volta para **Entrar na sua conta** e mantém as alterações pendentes neste dispositivo.
+- **Conflito de dados:** há versões diferentes e nenhuma escolha automática foi feita.
+- **Migração pendente:** é necessário escolher como tratar os dados locais antigos.
+
+Para forçar uma verificação, abra **Ajuda e manual** e clique em **Sincronizar agora**. O sistema também verifica a nuvem periodicamente, ao voltar para a aba e ao recuperar a conexão. Feche o navegador somente depois que uma operação importante aparecer como **Sincronizado**, quando houver internet.
+
+Se a sessão expirar durante o uso, entre novamente com a mesma conta. As alterações já salvas neste dispositivo continuam pendentes e serão enviadas depois do novo acesso; o sistema não confunde esse problema com falta de internet.
+
+### Como resolver um conflito
+
+Um conflito acontece quando dois dispositivos alteram os mesmos dados antes de uma das versões ser confirmada. O sistema bloqueia novas alterações para não escolher uma versão errada de estoque, O.S. ou pagamento.
+
+1. Leia **Resolva o conflito de dados**.
+2. Se a nuvem estiver correta, clique em **Usar dados da nuvem**. A versão pendente deste dispositivo será descartada.
+3. Se este dispositivo estiver correto, clique em **Usar dados deste computador**. A versão atual da nuvem será arquivada no servidor e a versão local será enviada.
+4. Aguarde **Sincronizado** e confira O.S., estoque e financeiro.
+
+O arquivo de conflitos do servidor guarda até 10 versões anteriores e não aparece como opção de restauração na tela. Se precisar recuperar uma dessas versões, use uma cópia de segurança ou peça apoio técnico ao administrador do projeto. Não tente contornar o conflito apagando o cache ou alterando o banco manualmente.
 
 ### Como navegar
 
 - No computador, use o menu à esquerda.
 - Em uma tela pequena, toque no botão de menu no topo para abrir as opções.
 - O botão **Nova O.S.** inicia um novo atendimento.
+- **Ordens de serviço** lista os orçamentos e serviços e é o primeiro item do menu.
 - **Painel** mostra o resumo do mês e os avisos.
-- **Ordens de serviço** lista os orçamentos e serviços.
-- **Clientes** guarda pessoas e veículos.
+- **Clientes e veículos** guarda pessoas e veículos. O cadastro é opcional para abrir uma O.S.
 - **Peças em estoque** controla o disponível e o mínimo.
 - **Compras** registra a entrada de peças.
 - **Fornecedores** guarda os contatos de compras.
@@ -56,7 +101,7 @@ Se você estiver usando uma prévia local, o endereço normalmente será `http:/
 - **Contas e caixa** mostra recebimentos, pagamentos e pendências.
 - **Ajuda e manual**, no final do menu, abre as ferramentas de cópia e, depois delas, o manual completo.
 
-Os endereços das telas usam `#`, por exemplo, `#/ordens`. Isso é normal. Compartilhar o endereço de uma tela não compartilha os dados: cada navegador tem seus próprios registros.
+Os endereços das telas usam `#`, por exemplo, `#/ordens`. Isso é normal. Compartilhar o endereço de uma tela não compartilha os dados: é necessário entrar na conta que possui os registros.
 
 ### Como aumentar ou diminuir a letra
 
@@ -74,7 +119,7 @@ O sistema usa **tema claro**, com fundos claros, texto escuro e cores de destaqu
 Para consultar o manual:
 
 1. Abra **Ajuda e manual**, que fica no final do menu de tópicos.
-2. Na página **Ajuda**, primeiro aparecem as ferramentas de cópia de segurança.
+2. Na página **Ajuda**, primeiro aparecem **Conta e sincronização** e **Cópia de segurança**.
 3. Role até o final da página para encontrar o **Manual do usuário**, seu índice e os botões **Voltar ao início** e **Imprimir manual**.
 4. Use o botão **Como usar**, disponível em algumas telas, para abrir diretamente a seção correspondente do manual.
 
@@ -86,7 +131,7 @@ Os campos de preço, desconto, despesa e valor unitário aceitam centavos. As qu
 
 ## 3. Painel inicial {#painel}
 
-O **Painel** é o ponto de partida. Ele mostra o mês atual e reúne as informações mais usadas.
+O **Painel** reúne o resumo do mês e as informações mais usadas. O uso diário começa em **Ordens de serviço**, que aparece primeiro no menu e como tela inicial. O Painel mantém o atalho **Abrir nova O.S.** em destaque para você ir diretamente ao atendimento.
 
 ### Cartões do resumo
 
@@ -98,7 +143,7 @@ O **Painel** é o ponto de partida. Ele mostra o mês atual e reúne as informa�
 ### Atalhos e avisos
 
 - **Abrir nova O.S.** inicia o assistente de três passos.
-- **Cadastrar cliente** abre a tela de clientes.
+- **Cadastrar cliente** abre a tela de clientes. Esse cadastro é opcional para a O.S.
 - **Entrada em peças** abre o lançamento de estoque.
 - **Registrar despesa** abre a tela de despesas.
 - **Atenção ao estoque** lista peças no estoque mínimo ou abaixo dele. Use **Repor** para fazer uma entrada.
@@ -110,18 +155,18 @@ O aviso de cópia de segurança aparece quando não há cópia recente registrad
 
 ## 4. Clientes e veículos {#clientes}
 
+Esses cadastros são **opcionais** para registrar uma O.S., inclusive no assistente da própria ordem. Use-os quando quiser guardar dados completos e reutilizar clientes e veículos em outros atendimentos. Para uma O.S. rápida, informe nome, telefone, placa e veículo diretamente no passo 1, sem criar cadastros. Para salvar um cadastro de cliente, informe nome e telefone; o e-mail continua opcional.
+
 ### Cadastrar um cliente
 
-1. Abra **Clientes** no menu.
+1. Abra **Clientes e veículos** no menu.
 2. Clique em **Novo cliente**.
 3. Preencha o **nome**, que é obrigatório.
-4. Escolha **Pessoa Física** ou **Pessoa Jurídica**.
-5. Informe CPF ou CNPJ, se desejar.
-6. Digite o telefone com DDD. Ele é obrigatório no cadastro. Exemplo: `(27) 99999-1010`.
-7. Preencha e-mail, endereço, cidade e observações, conforme necessário.
-8. Clique em **Salvar cliente**.
+4. Digite o **telefone**, também obrigatório. Use o DDD para preparar mensagens do WhatsApp. Exemplo: `(27) 99999-1010`.
+5. Se precisar, abra **Dados adicionais (opcional)** para informar tipo, CPF/CNPJ, e-mail, endereço, cidade e observações.
+6. Clique em **Salvar cliente**.
 
-O telefone é importante para preparar mensagens do WhatsApp. Um número sem DDD pode impedir a abertura da mensagem.
+Para salvar um cliente, nome e telefone são obrigatórios; o e-mail não é exigido. Para enviar mensagens, é necessário um telefone válido com DDD na O.S. ou no cadastro do cliente. Um número sem DDD pode impedir a abertura da mensagem.
 
 ### Buscar, editar ou excluir um cliente
 
@@ -143,12 +188,12 @@ O sistema não envia a mensagem sozinho. O envio depende de você e do WhatsApp.
 
 ### Cadastrar um veículo
 
-1. Abra **Clientes**.
+1. Abra **Clientes e veículos**.
 2. No cartão do cliente, clique em **Veículos**.
 3. Clique em **Adicionar veículo**.
-4. Informe a **placa**, que é obrigatória. O sistema a grava em letras maiúsculas e sem espaços.
-5. Preencha marca, modelo, ano, cor e quilometragem.
-6. Use **Observações** para detalhes permanentes do veículo.
+4. Escolha o **cliente** e informe a **placa**, obrigatórios para esse cadastro formal. O sistema grava a placa em letras maiúsculas e sem espaços.
+5. Preencha **Modelo / veículo**, se quiser.
+6. Se precisar, abra **Outros dados do veículo (opcional)** para informar marca, ano, cor, quilometragem e observações.
 7. Clique em **Salvar veículo**.
 
 ### Editar ou excluir um veículo
@@ -168,25 +213,26 @@ O número sugerido segue o formato `OS-0001`, `OS-0002` e assim por diante. Voc�
 
 ### Antes de abrir uma O.S.
 
-- Confirme se o cliente e o veículo já estão cadastrados.
-- Confira o telefone com DDD.
-- Cadastre as peças que serão usadas.
-- Anote a quilometragem e o problema relatado.
+- Você não precisa cadastrar cliente nem veículo.
+- Se for enviar mensagens, tenha um telefone com DDD, que pode ser digitado na própria O.S.
+- Cadastre apenas as peças que serão controladas pelo estoque.
+- Anote a quilometragem e o problema relatado, se essas informações estiverem disponíveis.
 
-### Passo 1: cliente e veículo
+### Passo 1: identificação opcional
 
 1. Clique em **Nova O.S.**.
-2. Em **Cliente**, escolha o nome na lista. O campo é obrigatório.
-3. Se necessário, clique em **Novo cliente**, faça o cadastro e volte ao assistente.
-4. Em **Veículo do cliente**, escolha o veículo. O campo é obrigatório.
-5. Se necessário, clique em **Novo veículo**, cadastre e volte ao assistente.
-6. Informe o **KM atual**.
-7. Confira a **data de abertura**.
-8. Preencha a **previsão de entrega**, se já combinada.
-9. Em **Problema relatado / serviço solicitado**, escreva com clareza o que o cliente relatou.
-10. Clique em **Continuar para peças e serviços**.
+2. Em **Cliente cadastrado**, escolha um cliente existente somente se quiser reutilizar o cadastro. A opção **Não cadastrar cliente** permite continuar sem vínculo.
+3. Se não escolher um cadastro, digite **Nome do cliente** e **Telefone / WhatsApp** diretamente, se souber. Esses campos são opcionais.
+4. Se precisar criar um cadastro formal, clique em **Cadastrar cliente**. Esse botão é facultativo. Nesse cadastro, nome e telefone são obrigatórios; o e-mail não é exigido. Salvar o cliente o seleciona na O.S. e o veículo continua opcional.
+5. Em **Veículo cadastrado**, escolha um veículo existente se ele estiver vinculado ao cliente selecionado. Para usar essa lista, é necessário escolher um cliente cadastrado.
+6. Sem cadastro, digite **Placa** e **Veículo / modelo** diretamente na O.S. Você também pode deixar os dois em branco.
+7. Se precisar criar um cadastro formal de veículo, clique em **Cadastrar veículo**. Esse botão é facultativo e não é necessário para abrir ou salvar a O.S. Nesse formulário, cliente e placa são obrigatórios; os demais dados ficam em seção opcional.
+8. Informe o **KM atual**, se houver.
+9. Confira a **data de abertura** e preencha a **previsão de entrega**, se já combinada.
+10. Em **Problema relatado / serviço solicitado**, escreva com clareza o que foi relatado.
+11. Clique em **Continuar para peças e serviços**.
 
-A placa e a descrição do veículo serão copiadas para a O.S. Use **Voltar** ou **Cancelar** se precisar desistir antes de salvar.
+O nome, o telefone, a placa e a descrição digitados são copiados para a O.S. Por isso, a impressão, as mensagens e o histórico continuam mostrando os dados do atendimento mesmo que nenhum cadastro formal seja criado. Use **Voltar** ou **Cancelar** se precisar desistir antes de salvar.
 
 ### Passo 2: peças e serviços
 
@@ -209,7 +255,7 @@ Enquanto a O.S. estiver em **Orçamento**, nenhuma peça sai do estoque. O desco
 
 ### Passo 3: revisão e salvamento
 
-1. Confira cliente, veículo, quantidade de itens e subtotal.
+1. Confira a identificação do cliente e do veículo, quando houver, além da quantidade de itens e do subtotal.
 2. Use **Alterar itens** para voltar ao passo 2, se necessário.
 3. Confira o **número da O.S.**.
 4. Escolha o **status**. Para enviar um orçamento antes da autorização, deixe **Orçamento**.
@@ -288,7 +334,7 @@ Na versão atual, a tela da O.S. não possui um campo separado para escolher out
 
 ### Preparar uma mensagem no WhatsApp
 
-1. Confira se o cliente tem telefone com DDD.
+1. Confira se há telefone com DDD na O.S. ou no cadastro do cliente. Não é necessário cadastrar o cliente para enviar mensagens.
 2. Abra a O.S. ou o cartão do cliente.
 3. Clique no botão de WhatsApp adequado: orçamento, andamento, cobrança, aviso de que está pronto ou mensagem cancelada.
 4. Na janela **Mensagem preparada**, confira o destinatário e leia o texto inteiro.
@@ -296,6 +342,8 @@ Na versão atual, a tela da O.S. não possui um campo separado para escolher out
 6. Clique em **Abrir WhatsApp**.
 7. No WhatsApp, confira novamente nome, placa, valores, datas e condições.
 8. Toque em **Enviar** dentro do WhatsApp.
+
+O telefone salvo na O.S. tem prioridade sobre o telefone do cadastro, preservando o contato usado no atendimento. Se a O.S. não tiver telefone válido, os botões de mensagem não aparecem nela. Edite a O.S. e informe **Telefone / WhatsApp** com DDD antes de usar esse recurso. No cartão do cliente, o botão só aparece quando há telefone salvo.
 
 > **Atenção:** o sistema não envia mensagens automaticamente. Ele não usa uma API automática do WhatsApp, não confirma entrega e não guarda o histórico das conversas. A mensagem só é enviada quando você confirma no WhatsApp.
 
@@ -548,7 +596,7 @@ Faça uma cópia toda semana, antes de mudanças importantes e antes de trocar d
 
 ### Restaurar uma cópia
 
-1. Antes de restaurar, baixe uma cópia dos dados que estão atualmente no navegador.
+1. Antes de restaurar, baixe uma cópia dos dados que estão atualmente na conta.
 2. Abra **Ajuda e manual**.
 3. Clique em **Restaurar cópia**.
 4. Escolha o arquivo JSON gerado pelo Franlin Car Veículos. Arquivos com mais de 10 MB são recusados.
@@ -556,7 +604,7 @@ Faça uma cópia toda semana, antes de mudanças importantes e antes de trocar d
 6. Aguarde a mensagem de conclusão.
 7. Confira clientes, O.S., peças e financeiro.
 
-> **Atenção:** restaurar substitui todos os dados locais pelos dados do arquivo. Não é uma mesclagem. Um arquivo inválido ou sem dados reconhecíveis do sistema é rejeitado.
+> **Atenção:** restaurar substitui todos os dados da conta pelos dados do arquivo e envia essa substituição para a nuvem. Não é uma mesclagem. Sem internet, a restauração fica pendente neste dispositivo até a conexão voltar. Um arquivo inválido ou sem dados reconhecíveis do sistema é rejeitado.
 
 ### Aparece o aviso de dados salvos corrompidos
 
@@ -576,7 +624,7 @@ Esse aviso significa que o conteúdo gravado pelo navegador não pôde ser lido 
 5. Na confirmação final, clique em **Sim, apagar definitivamente**.
 6. O sistema volta ao estado vazio.
 
-> **Atenção:** apagar todos os dados é definitivo. A única forma de recuperar o que foi apagado é restaurar uma cópia feita antes.
+> **Atenção:** apagar todos os dados é definitivo na conta e será sincronizado para os outros dispositivos. Sem internet, a limpeza fica pendente até a conexão voltar. A única forma de recuperar o que foi apagado é restaurar uma cópia feita antes.
 
 ## 14. Dados de exemplo {#demo}
 
@@ -592,7 +640,7 @@ Os dados de exemplo servem para treinar o uso do sistema. Eles incluem clientes,
 
 O botão é oferecido somente quando todas as listas estão vazias: clientes, veículos, fornecedores, peças, movimentações, O.S., compras e despesas. Se houver qualquer registro, nem o botão nem o carregamento são permitidos. O sistema não mescla os dados de exemplo com registros reais.
 
-> **Atenção:** nunca carregue dados de exemplo em um navegador que contenha registros reais sem fazer uma cópia antes. Não envie mensagens para os telefones de exemplo.
+> **Atenção:** nunca carregue dados de exemplo em uma conta que contenha registros reais sem fazer uma cópia antes. Os dados de exemplo também são sincronizados com a nuvem. Não envie mensagens para os telefones de exemplo.
 
 ### Remover os dados de exemplo
 
@@ -607,15 +655,28 @@ Não é possível transformar os dados de exemplo em dados reais. Eles devem ser
 
 ### Onde os dados ficam
 
-- Os dados são salvos no armazenamento local do navegador.
-- A chave usada pelo sistema é `fcv.store.v1`.
-- Cada combinação de navegador, perfil e endereço do site possui seus próprios dados.
-- Um computador não sincroniza automaticamente com outro computador ou celular.
-- Modo anônimo ou privado pode descartar os dados ao fechar.
-- Limpar os dados do site pode apagar os registros.
-- O navegador pode recusar o salvamento se o armazenamento estiver cheio.
+- Os dados da conta ficam no Supabase, com acesso protegido por login e regras de isolamento por usuário.
+- Cada dispositivo mantém um cache local separado por conta, além das alterações offline ainda não enviadas.
+- A chave antiga `fcv.store.v1` é usada somente para reconhecer dados da versão anterior e propor a migração.
+- Computadores e celulares que entrarem na mesma conta recebem os dados da nuvem.
+- Contas diferentes não compartilham registros.
+- Modo anônimo ou privado pode descartar a sessão e o cache ao fechar.
+- Limpar os dados do site pode apagar o cache e as alterações offline que ainda não foram enviadas.
+- O navegador pode recusar o salvamento local se o armazenamento estiver cheio.
 
-Se o sistema estiver aberto em duas abas do mesmo navegador, perfil e endereço, uma alteração salva em uma aba atualiza a outra. A tela é recarregada e rascunhos de O.S. ou compras ainda não salvos são descartados nessa atualização. Evite editar o mesmo registro em duas abas ao mesmo tempo. Esse recurso não transfere dados entre dispositivos ou pessoas.
+### Como usar sem internet
+
+Depois que o sistema carregou os dados da conta pelo menos uma vez, as telas já abertas e o shell do aplicativo podem continuar disponíveis sem conexão. O status **Offline** indica que as novas alterações estão somente neste dispositivo. Não feche a aba nem limpe os dados do site enquanto houver pendências.
+
+Quando a internet voltar, o sistema envia as alterações mantendo a ordem e o identificador da operação. Se a resposta for perdida, uma nova tentativa usa o mesmo identificador para não duplicar a revisão. Se outro dispositivo tiver alterado a mesma base antes, aparece um conflito e nenhuma versão é sobrescrita automaticamente.
+
+A primeira entrada em um dispositivo sem cache ainda precisa de internet. O service worker não guarda respostas da API, senhas, tokens ou dados da nuvem; ele guarda apenas os arquivos estáticos necessários para abrir o aplicativo.
+
+### Abas e dispositivos abertos ao mesmo tempo
+
+Abas da mesma conta podem receber atualizações umas das outras. Dispositivos diferentes também verificam a nuvem periodicamente. Rascunhos de O.S. ou compras que ainda não foram salvos não são sincronizados e podem ser perdidos se a tela for recarregada.
+
+Evite editar o mesmo registro em dois dispositivos ao mesmo tempo. Se isso acontecer, aguarde **Sincronizado**, confira a tela de conflito e escolha a versão correta. O sistema nunca combina automaticamente movimentações de estoque ou pagamentos de versões diferentes.
 
 ### Se o navegador não conseguir salvar
 
@@ -630,10 +691,11 @@ Nesse caso, baixe uma cópia de segurança, libere espaço removendo registros q
 3. Faça cópias de segurança com frequência.
 4. Guarde as cópias em local protegido.
 5. Não coloque senhas, tokens ou dados de clientes dentro do repositório do projeto.
-6. Ao trocar de computador, restaure a cópia no novo navegador.
-7. Ao usar outro navegador no mesmo computador, restaure a cópia separadamente.
+6. Ao trocar de computador, entre na mesma conta e aguarde **Sincronizado** antes de trabalhar.
+7. Ao usar outro navegador no mesmo computador, entre na mesma conta; não é preciso restaurar a cópia apenas para transferir dados.
+8. Use senha forte e não compartilhe a conta com pessoas que não devem alterar a oficina.
 
-O site ser público significa que qualquer pessoa pode abrir o endereço. Isso não significa que os dados locais de um navegador sejam publicados na internet. Porém, qualquer pessoa que usar o mesmo perfil do navegador poderá ver e alterar esses dados, pois não existe login.
+O site ser público significa que qualquer pessoa pode abrir o endereço, mas os dados só são acessados depois de entrar em uma conta. Qualquer pessoa que conhecer o e-mail e a senha poderá ver e alterar os dados dessa conta. Por isso, proteja a sessão e use **Sair** em dispositivos compartilhados.
 
 ## 16. Solução de problemas {#problemas}
 
@@ -671,11 +733,36 @@ O site ser público significa que qualquer pessoa pode abrir o endereço. Isso n
 
 ### Os dados desapareceram
 
-1. Confirme se você está no mesmo navegador, perfil e endereço.
+1. Confirme se entrou com o e-mail da conta correta.
 2. Confira se não está em uma janela anônima.
-3. Abra **Ajuda e manual**.
-4. Restaure a última cópia de segurança.
-5. Depois de recuperar, faça uma nova cópia.
+3. Aguarde **Sincronizado** e clique em **Sincronizar agora** em **Ajuda e manual**.
+4. Confira se outro dispositivo não está com um conflito pendente.
+5. Se ainda faltarem dados, abra **Ajuda e manual** e restaure a última cópia de segurança.
+6. Depois de recuperar, faça uma nova cópia.
+
+### Aparece conflito de dados
+
+1. Pare de editar e não limpe os dados do site.
+2. Confira qual dispositivo fez a última alteração correta.
+3. Escolha **Usar dados da nuvem** ou **Usar dados deste computador** conforme a seção 2.
+4. Aguarde **Sincronizado**.
+5. Confira O.S., estoque, compras e caixa antes de continuar.
+
+### Aparece offline ou falha na sincronização
+
+1. Confira a conexão com a internet.
+2. Mantenha a página aberta enquanto houver alterações pendentes.
+3. Clique em **Tentar novamente** ou em **Ajuda e manual > Sincronizar agora**.
+4. Se estiver usando muitos dispositivos, aguarde cada um mostrar **Sincronizado**.
+5. Se a falha continuar, faça uma cópia de segurança e procure apoio técnico.
+
+### Não consigo entrar ou receber o link de recuperação
+
+1. Confira o e-mail digitado e a senha.
+2. Confira a caixa de entrada e a pasta de spam.
+3. Use **Esqueci minha senha** para receber um novo link.
+4. Confira se o endereço do sistema está correto.
+5. Se o link expirar, solicite outro. Não compartilhe senhas ou links de recuperação.
 
 ### O WhatsApp não abre
 
@@ -725,15 +812,23 @@ O site ser público significa que qualquer pessoa pode abrir o endereço. Isso n
 
 ### Preciso de login ou senha?
 
-Não. O sistema não possui login. Proteja o perfil do navegador e o dispositivo para evitar acesso por outras pessoas.
+Sim. Entre com o e-mail e a senha da conta da oficina. A mesma conta pode ser usada em vários dispositivos. Contas diferentes têm dados separados. Proteja a senha e use **Sair** em dispositivos compartilhados.
+
+### Posso abrir uma O.S. sem cliente e sem veículo?
+
+Sim. Cliente e veículo são opcionais no passo 1. Você pode deixar todos esses campos em branco ou digitar apenas nome, telefone, placa e descrição do veículo diretamente na O.S. Os cadastros completos continuam disponíveis para quem quiser reutilizar dados.
+
+### Preciso cadastrar o cliente para enviar WhatsApp?
+
+Não. Basta informar um telefone válido com DDD na O.S. ou no cadastro do cliente. O envio continua sendo manual, depois de conferir a mensagem e o destinatário.
 
 ### Posso usar em dois computadores ao mesmo tempo?
 
-Sim, mas os dados não são sincronizados. Cada navegador terá uma cópia independente. Use as ferramentas de exportar e restaurar para transferir informações.
+Sim. Entre na mesma conta nos dois dispositivos e aguarde **Sincronizado**. Evite editar o mesmo registro ao mesmo tempo. Se houver versões diferentes, o sistema bloqueia as alterações e pede uma escolha explícita.
 
 ### O que acontece se eu abrir duas abas?
 
-No mesmo navegador, perfil e endereço, as alterações salvas são atualizadas entre as abas. Rascunhos de O.S. ou compras ainda não salvos podem ser descartados nessa atualização. Em dispositivos diferentes, os dados continuam independentes.
+As abas da mesma conta podem receber atualizações umas das outras. Rascunhos de O.S. ou compras ainda não salvos não são sincronizados e podem ser descartados se a tela for recarregada. Em dispositivos diferentes, a sincronização depende da conexão e do status exibido.
 
 ### O WhatsApp envia a mensagem automaticamente?
 
@@ -761,7 +856,7 @@ A exclusão reverte a entrada da compra, retirando do estoque as quantidades que
 
 ### Apagar os dados afeta outro computador?
 
-Não. A limpeza vale somente para o navegador e o perfil em que foi feita. Outros dispositivos continuam com seus dados locais.
+Sim, se o outro computador estiver usando a mesma conta. A limpeza é sincronizada para a nuvem e os dispositivos recebem o estado vazio. Se estiver offline, a limpeza fica pendente até a conexão voltar. Contas diferentes não são afetadas.
 
 ### Com que frequência devo fazer cópia?
 
@@ -784,8 +879,8 @@ Ao alterar o sistema:
 5. Execute `npm test`.
 6. Confirme se o CI bloqueia mudanças funcionais sem a atualização correspondente do manual.
 
-Não documente recursos que não existem, como sincronização em nuvem, acesso multiusuário, login, integração bancária ou envio automático pelo WhatsApp.
+Não documente recursos que não existem, como integração bancária, edição colaborativa simultânea ou envio automático pelo WhatsApp. A sincronização e o login existem, mas não substituem cópias de segurança nem permitem que duas pessoas alterem a mesma versão sem conflito.
 
 ---
 
-Franlin Car Veículos · Manual do usuário · Versão 1.0.2
+Franlin Car Veículos · Manual do usuário · Versão 1.1.0

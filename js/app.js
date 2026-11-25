@@ -1,13 +1,14 @@
 import * as S from './store.js';
 import * as U from './ui.js';
+import { loadConfig, SupabaseClient } from './supabase.js';
+import { SyncManager } from './sync.js';
 import {
   esc, money, qty, fmtDate, fmtDateTime, todayISO, monthKey, monthLabel,
   whatsAppNumber, onlyDigits, phoneLooksValid, sum, sortBy, normalizeSearch,
   vehicleTitle, fileStamp, nowISO, round2, isInMonth
 } from './util.js';
 
-const APP_VERSION = '1.0.2';
-const STORAGE_KEY = 'fcv.store.v1';
+const APP_VERSION = '1.1.0';
 const root = document.getElementById('app');
 
 const viewState = {
@@ -22,6 +23,15 @@ const viewState = {
 
 let osDraft = null;
 let purchaseDraft = null;
+let authClient = null;
+let syncManager = null;
+let syncSnapshot = null;
+let authConfigured = false;
+let authMode = 'login';
+let authError = '';
+let authEmail = '';
+let authNotice = '';
+let booting = true;
 let manualCache = '';
 let manualRequest = null;
 let vehicleReturnClient = '';
@@ -107,8 +117,8 @@ function notFoundView() {
       ${U.pageHead({ title: 'Página não encontrada', subtitle: 'O endereço acessado não existe neste sistema.' })}
       ${U.emptyState({
         iconName: 'ajuda', title: 'Vamos voltar ao início?',
-        text: 'Use o menu ao lado ou volte para o painel.',
-        action: `<a class="btn btn-primary" href="#/">Ir para o painel</a>`
+        text: 'Use o menu ao lado ou volte para as ordens de serviço.',
+        action: `<a class="btn btn-primary" href="#/ordens">Ir para ordens de serviço</a>`
       })}
     </div>
   `;
@@ -128,20 +138,47 @@ function applyFontScale() {
 }
 
 function render() {
+  if (booting) {
+    root.innerHTML = '<main class="auth-page"><section class="auth-card"><span class="gate-icon"><span class="loading-dot" aria-hidden="true"></span></span><h1>Conectando…</h1><p class="auth-subtitle">Verificando sua conta e os dados da oficina.</p></section></main>';
+    return;
+  }
+  if (!authClient?.user) {
+    root.innerHTML = U.authView({ mode: authMode, error: authError || authNotice, email: authEmail, configured: authConfigured });
+    document.title = `${authMode === 'login' ? 'Entrar' : authMode === 'signup' ? 'Criar conta' : 'Recuperar senha'} · Franlin Car Veículos`;
+    return;
+  }
+  if (syncManager?.conflict) {
+    root.innerHTML = U.conflictView({ conflict: syncManager.conflict });
+    document.title = 'Conflito de dados · Franlin Car Veículos';
+    return;
+  }
+  if (syncManager?.pendingMigration) {
+    root.innerHTML = U.migrationView({ migration: syncManager.pendingMigration });
+    document.title = 'Migrar dados · Franlin Car Veículos';
+    return;
+  }
+
   const route = parseRoute();
   const routeKey = `${route.path}${route.query.toString() ? `?${route.query.toString()}` : ''}`;
   const content = contentForPath(route.path, route.query);
   const storageWarning = S.storageWarning();
+  const syncWarning = syncSnapshot?.status === 'error' ? `
+    <div class="notice notice-warning" role="alert">
+      <span class="notice-icon">${icon('alerta')}</span>
+      <div><strong>Não foi possível sincronizar agora</strong><p>${esc(syncSnapshot.message || 'Verifique sua conexão.')}</p></div>
+      <button type="button" class="btn btn-small btn-warning" data-action="syncNow">Tentar novamente</button>
+    </div>` : '';
   root.innerHTML = U.shell({
     path: route.path,
     counts: S.sidebarCounts(),
-    content: storageWarning ? `
+    content: `${syncWarning}${storageWarning ? `
       <div class="notice notice-warning" role="alert">
         <span class="notice-icon">${icon('alerta')}</span>
         <div><strong>Dados salvos precisam de atenção</strong><p>${esc(storageWarning)}</p></div>
         <a class="btn btn-small btn-warning" href="#/ajuda">Ver opções de recuperação</a>
-      </div>${content}` : content,
-    fontLabel: FONT_LABELS[fontScale]
+      </div>` : ''}${content}`,
+    fontLabel: FONT_LABELS[fontScale],
+    sync: syncSnapshot
   });
   document.title = `${titleForPath(route.path)} · Franlin Car Veículos`;
   document.body.classList.remove('menu-open');
@@ -190,8 +227,8 @@ function dashboardView() {
         <div><h2>O que você deseja fazer?</h2><p>As tarefas mais usadas, com poucos cliques.</p></div>
       </div>
       <div class="quick-grid">
-        ${quickAction({ iconName: 'plus', title: 'Abrir nova O.S.', text: 'Cliente, veículo, peças e serviço', href: '#/ordens/nova', primary: true })}
-        ${quickAction({ iconName: 'clientes', title: 'Cadastrar cliente', text: 'Pessoa e veículos', href: '#/clientes' })}
+        ${quickAction({ iconName: 'plus', title: 'Abrir nova O.S.', text: 'Peças, serviço e pagamento', href: '#/ordens/nova', primary: true })}
+        ${quickAction({ iconName: 'clientes', title: 'Cadastrar cliente', text: 'Opcional, para reutilizar dados', href: '#/clientes' })}
         ${quickAction({ iconName: 'estoque', title: 'Entrada em peças', text: 'Registrar chegada ou saída', action: 'openMovement' })}
         ${quickAction({ iconName: 'despesas', title: 'Registrar despesa', text: 'Conta da oficina', href: '#/despesas' })}
       </div>
@@ -203,11 +240,11 @@ function dashboardView() {
       <div class="onboarding-copy">
         <span class="eyebrow">Primeiros passos</span>
         <h2>Bem-vindo ao sistema da Franlin Car Veículos</h2>
-        <p>Comece pelos clientes e pelas peças. Depois, abra uma ordem de serviço e envie o orçamento pelo WhatsApp.</p>
+        <p>Comece pela ordem de serviço. Cliente e veículo são opcionais e podem ser informados depois.</p>
         <ol class="onboarding-steps">
-          <li><span>1</span><div><strong>Cadastre o cliente e o veículo</strong><small>Assim os próximos atendimentos ficam mais rápidos.</small></div></li>
-          <li><span>2</span><div><strong>Cadastre as peças da oficina</strong><small>Informe o estoque atual e o estoque mínimo.</small></div></li>
-          <li><span>3</span><div><strong>Abra a primeira O.S.</strong><small>Monte o orçamento e envie pelo WhatsApp.</small></div></li>
+          <li><span>1</span><div><strong>Abra a primeira O.S.</strong><small>Descreva o serviço e adicione peças ou mão de obra.</small></div></li>
+          <li><span>2</span><div><strong>Cadastre as peças da oficina</strong><small>Necessário apenas quando for controlar o estoque.</small></div></li>
+          <li><span>3</span><div><strong>Aprove, fatura e receba</strong><small>Acompanhe o status e o pagamento na própria O.S.</small></div></li>
         </ol>
         <div class="onboarding-actions">
           <button type="button" class="btn btn-primary" data-action="loadDemo">${icon('painel')}Ver dados de exemplo</button>
@@ -221,7 +258,7 @@ function dashboardView() {
   const backupBanner = !empty && backupOld ? `
     <div class="notice notice-warning">
       <span class="notice-icon">${icon('banco')}</span>
-      <div><strong>Faça uma cópia de segurança</strong><p>Os dados ficam salvos neste navegador. Guarde uma cópia para não perder as informações se limpar o navegador ou trocar de computador.</p></div>
+      <div><strong>Faça uma cópia de segurança</strong><p>A nuvem mantém os dados disponíveis entre computadores. Baixe também uma cópia para guardar fora do sistema.</p></div>
       <a class="btn btn-small btn-warning" href="#/ajuda">Fazer cópia</a>
     </div>
   ` : '';
@@ -264,7 +301,7 @@ function dashboardView() {
         ${data.recentOrders.map((order) => `
           <a class="mini-row mini-link" href="#/ordens/${esc(order.id)}">
             <span class="mini-icon tone-blue">${icon('os')}</span>
-            <div class="mini-copy"><strong>${esc(order.numero)} · ${esc(order.clienteNome)}</strong><small>${esc(order.veiculoDescricao || 'Veículo não informado')}${order.veiculoPlaca ? ` · ${esc(order.veiculoPlaca)}` : ''}</small></div>
+            <div class="mini-copy"><strong>${esc(order.numero)} · ${esc(order.clienteNome || 'Cliente não informado')}</strong><small>${esc(order.veiculoDescricao || 'Veículo não informado')}${order.veiculoPlaca ? ` · ${esc(order.veiculoPlaca)}` : ''}</small></div>
             <div class="mini-side"><strong>${esc(money(order.total))}</strong>${U.statusBadge(order.status)}</div>
           </a>
         `).join('')}
@@ -325,7 +362,7 @@ function ordersView() {
     <div class="page-wrap">
       ${U.pageHead({
         title: 'Ordens de serviço',
-        subtitle: 'Do orçamento ao pagamento. As peças saem do estoque quando a O.S. é aprovada.',
+        subtitle: 'Registre o serviço com ou sem cliente e veículo. As peças saem do estoque quando a O.S. é aprovada.',
         help: 'ordens',
         actions: `<a class="btn btn-primary" href="#/ordens/nova">${icon('plus')}Nova O.S.</a>`
       })}
@@ -378,7 +415,7 @@ function renderOrdersList() {
       <span class="record-icon">${icon('os')}</span>
       <div class="record-main">
         <div class="record-title-line"><strong>${esc(order.numero)}</strong>${U.statusBadge(order.status)}${order.status === 'Faturada' ? U.statusBadge(order.pago ? 'Pago' : 'Pendente') : ''}</div>
-        <p>${esc(order.clienteNome)}</p>
+        <p>${esc(order.clienteNome || 'Cliente não informado')}</p>
         <small>${esc(order.veiculoDescricao || 'Veículo não informado')}${order.veiculoPlaca ? ` · ${esc(order.veiculoPlaca)}` : ''}</small>
       </div>
       <div class="record-side">
@@ -405,7 +442,7 @@ function orderDetailView(id) {
         <div>
           <div class="eyebrow">Ordem de serviço</div>
           <h1>O.S. ${esc(order.numero)}</h1>
-          <p>${esc(order.clienteNome)} · ${esc(order.veiculoDescricao || 'Veículo não informado')}${order.veiculoPlaca ? ` · ${esc(order.veiculoPlaca)}` : ''}</p>
+          <p>${esc(order.clienteNome || 'Cliente não informado')} · ${esc(order.veiculoDescricao || 'Veículo não informado')}${order.veiculoPlaca ? ` · ${esc(order.veiculoPlaca)}` : ''}</p>
           <div class="badge-line">${U.statusBadge(order.status)}${order.estoqueBaixado ? `<span class="stock-used">${icon('estoque')}Peças baixadas do estoque</span>` : ''}</div>
         </div>
         <div class="detail-total"><span>Total da O.S.</span><strong>${esc(money(totals.total))}</strong></div>
@@ -462,20 +499,20 @@ function orderDetailView(id) {
           </section>
 
           <section class="card">
-            <div class="card-head"><div><h2>${icon('clientes')}Cliente</h2></div></div>
+            <div class="card-head"><div><h2>${icon('clientes')}Cliente (opcional)</h2></div></div>
             <div class="person-block">
-              ${U.avatar(order.clienteNome)}
-              <div><strong>${esc(order.clienteNome)}</strong><small>${esc(phone || 'Telefone não informado')}</small></div>
+              ${U.avatar(order.clienteNome || '?')}
+              <div><strong>${esc(order.clienteNome || 'Cliente não informado')}</strong><small>${esc(phone || 'Telefone não informado')}</small></div>
             </div>
             <dl class="data-list">
-              <div><dt>CPF / CNPJ</dt><dd>${esc(order.clienteDocumento || '—')}</dd></div>
-              <div><dt>Endereço</dt><dd>${esc(order.clienteEndereco || '—')}</dd></div>
+              ${order.clienteDocumento ? `<div><dt>CPF / CNPJ</dt><dd>${esc(order.clienteDocumento)}</dd></div>` : ''}
+              ${order.clienteEndereco ? `<div><dt>Endereço</dt><dd>${esc(order.clienteEndereco)}</dd></div>` : ''}
             </dl>
             ${client ? `<a class="btn btn-secondary btn-block" href="#/clientes?cliente=${esc(client.id)}">${icon('clientes')}Abrir cadastro do cliente</a>` : ''}
           </section>
 
           <section class="card">
-            <div class="card-head"><div><h2>${icon('carro')}Veículo</h2></div></div>
+            <div class="card-head"><div><h2>${icon('carro')}Veículo (opcional)</h2></div></div>
             <div class="vehicle-block">${icon('carro')}<div><strong>${esc(order.veiculoDescricao || 'Não informado')}</strong><small>${esc(order.veiculoPlaca || 'Placa não informada')}</small></div></div>
             ${vehicle ? `<p class="fine-print">Veículo vinculado ao cadastro do cliente.</p>` : ''}
           </section>
@@ -483,7 +520,7 @@ function orderDetailView(id) {
           <section class="card">
             <div class="card-head"><div><h2>Outras ações</h2></div></div>
             <div class="action-stack">
-              <button type="button" class="btn btn-whatsapp btn-block" data-action="orderWhatsApp" data-id="${esc(order.id)}" data-template="${esc(order.status === 'Orçamento' ? 'orcamento' : order.status === 'Cancelada' ? 'cancelada' : order.status === 'Faturada' ? 'pronta' : 'andamento')}">${icon('whatsapp')}Enviar mensagem no WhatsApp</button>
+              ${phone ? `<button type="button" class="btn btn-whatsapp btn-block" data-action="orderWhatsApp" data-id="${esc(order.id)}" data-template="${esc(order.status === 'Orçamento' ? 'orcamento' : order.status === 'Cancelada' ? 'cancelada' : order.status === 'Faturada' ? 'pronta' : 'andamento')}">${icon('whatsapp')}Enviar mensagem no WhatsApp</button>` : ''}
               <button type="button" class="btn btn-secondary btn-block" data-action="orderPrint" data-id="${esc(order.id)}">${icon('imprimir')}Imprimir / salvar PDF</button>
               <a class="btn btn-secondary btn-block" href="#/ordens/${esc(order.id)}/editar">${icon('editar')}Editar O.S.</a>
               <button type="button" class="btn btn-danger-ghost btn-block" data-action="orderDelete" data-id="${esc(order.id)}">${icon('lixeira')}Excluir O.S.</button>
@@ -514,20 +551,24 @@ function orderItemsTable(items) {
 
 function nextOrderActions(order, phone) {
   const buttons = [];
+  const canSendWhatsApp = phoneLooksValid(phone);
+  const whatsAppButton = (template, label) => canSendWhatsApp
+    ? `<button type="button" class="btn btn-whatsapp btn-block" data-action="orderWhatsApp" data-id="${esc(order.id)}" data-template="${esc(template)}">${icon('whatsapp')}${esc(label)}</button>`
+    : '';
   if (order.status === 'Orçamento') {
-    buttons.push(`<button type="button" class="btn btn-whatsapp btn-block" data-action="orderWhatsApp" data-id="${esc(order.id)}" data-template="orcamento">${icon('whatsapp')}Enviar orçamento</button>`);
+    buttons.push(whatsAppButton('orcamento', 'Enviar orçamento'));
     buttons.push(`<button type="button" class="btn btn-success btn-block" data-action="orderApprove" data-id="${esc(order.id)}">${icon('check')}Cliente aprovou</button>`);
   } else if (order.status === 'Aprovada') {
-    buttons.push(`<button type="button" class="btn btn-whatsapp btn-block" data-action="orderWhatsApp" data-id="${esc(order.id)}" data-template="andamento">${icon('whatsapp')}Avisar cliente</button>`);
+    buttons.push(whatsAppButton('andamento', 'Avisar cliente'));
     buttons.push(`<button type="button" class="btn btn-primary btn-block" data-action="orderInvoice" data-id="${esc(order.id)}">${icon('despesas')}Faturar O.S.</button>`);
   } else if (order.status === 'Faturada') {
     if (!order.pago) {
       buttons.push(`<button type="button" class="btn btn-success btn-block" data-action="orderPay" data-id="${esc(order.id)}">${icon('check')}Marcar como recebida</button>`);
-      buttons.push(`<button type="button" class="btn btn-whatsapp btn-block" data-action="orderWhatsApp" data-id="${esc(order.id)}" data-template="cobranca">${icon('whatsapp')}Cobrar no WhatsApp</button>`);
+      buttons.push(whatsAppButton('cobranca', 'Cobrar no WhatsApp'));
     } else {
       buttons.push(`<div class="notice notice-success compact">${icon('checkCircle')}<div><strong>Pagamento recebido</strong><p>${esc(fmtDate(order.dataPagamento))}</p></div></div>`);
     }
-    buttons.push(`<button type="button" class="btn btn-whatsapp btn-block" data-action="orderWhatsApp" data-id="${esc(order.id)}" data-template="pronta">${icon('whatsapp')}Avisar que está pronto</button>`);
+    buttons.push(whatsAppButton('pronta', 'Avisar que está pronto'));
   } else if (order.status === 'Cancelada') {
     buttons.push(`<button type="button" class="btn btn-primary btn-block" data-action="orderReopen" data-id="${esc(order.id)}">${icon('voltar')}Reabrir como orçamento</button>`);
   }
@@ -537,13 +578,15 @@ function nextOrderActions(order, phone) {
   if (order.status === 'Cancelada') {
     buttons.push(`<p class="field-help">O.S. cancelada. Se as peças haviam sido baixadas, elas voltaram ao estoque.</p>`);
   }
-  if (!phone) buttons.push(`<p class="field-help text-warning">Cadastre o telefone com DDD do cliente para enviar mensagens.</p>`);
+  if (!canSendWhatsApp) buttons.push(`<p class="field-help text-warning">Informe um telefone com DDD na O.S. para liberar as mensagens do WhatsApp.</p>`);
   return buttons.join('');
 }
 
 function blankOsDraft() {
   return {
-    id: '', numero: S.peekNextOrderNumber(), clienteId: '', veiculoId: '', km: '',
+    id: '', numero: S.peekNextOrderNumber(),
+    clienteId: '', clienteNome: '', clienteTelefone: '',
+    veiculoId: '', veiculoPlaca: '', veiculoDescricao: '', km: '',
     dataAbertura: todayISO(), dataPrevisao: '', problemaRelatado: '', itens: [],
     desconto: 0, status: 'Orçamento', formaPagamento: '', pago: false, observacoes: '', step: 1
   };
@@ -574,7 +617,7 @@ function orderFormView(id) {
 
 function osStepper(step) {
   const steps = [
-    { number: 1, label: 'Cliente e veículo', id: 'cliente' },
+    { number: 1, label: 'Identificação opcional', id: 'cliente' },
     { number: 2, label: 'Peças e serviços', id: 'itens' },
     { number: 3, label: 'Revisão e envio', id: 'revisao' }
   ];
@@ -591,28 +634,25 @@ function osStepOne(draft) {
   const client = S.clienteById(draft.clienteId);
   return `
     <header class="form-page-head">
-      <div><span class="eyebrow">Passo 1 de 3</span><h1>${draft.id ? 'Editar cliente e veículo' : 'Quem será atendido?'}</h1><p>Escolha um cliente cadastrado e o veículo que está na oficina.</p></div>
+      <div><span class="eyebrow">Passo 1 de 3</span><h1>${draft.id ? 'Editar dados do atendimento' : 'Dados do atendimento'}</h1><p>Cliente e veículo são opcionais. Registre a O.S. agora e cadastre depois, somente se quiser.</p></div>
     </header>
     <form class="form-card" data-form="osStep1">
-      ${!clients.length ? U.emptyState({
-        iconName: 'clientes', title: 'Cadastre o primeiro cliente',
-        text: 'Sem cliente não é possível abrir uma O.S.',
-        action: `<button type="button" class="btn btn-primary" data-action="newClient">${icon('plus')}Cadastrar cliente</button>`,
-        compact: true
-      }) : `
-        <div class="form-section">
-          <div class="form-section-head"><span>1</span><div><h2>Cliente</h2><p>O telefone será usado no WhatsApp.</p></div><button type="button" class="btn btn-small btn-secondary" data-action="newClient">${icon('plus')}Novo cliente</button></div>
-          <div class="form-grid">
-            ${U.selectField({ label: 'Cliente', name: 'clienteId', value: draft.clienteId, required: true, options: clients.map((item) => ({ value: item.id, label: `${item.nome}${item.telefone ? ` · ${item.telefone}` : ''}` })), placeholder: 'Escolha o cliente', span: 2, attrs: 'data-os-client' })}
-            ${client ? `<div class="inline-note field-span2">${icon('telefone')}<span>${esc(client.telefone || 'Sem telefone cadastrado')} · ${esc(client.cpfCnpj || 'Sem CPF/CNPJ')}</span></div>` : ''}
-          </div>
+      <div class="form-section">
+        <div class="form-section-head"><span>1</span><div><h2>Cliente (opcional)</h2><p>Use um cadastro pronto, informe os dados abaixo ou cadastre aqui somente se quiser.</p></div><button type="button" class="btn btn-small btn-secondary" data-action="newClient">${icon('plus')}Cadastrar cliente</button></div>
+        <div class="form-grid">
+          ${U.selectField({ label: 'Cliente cadastrado', name: 'clienteId', value: draft.clienteId, options: clients.map((item) => ({ value: item.id, label: `${item.nome}${item.telefone ? ` · ${item.telefone}` : ''}` })), placeholder: 'Não cadastrar cliente', span: 2, attrs: 'data-os-client', help: 'O cadastro é opcional e serve para reutilizar os dados.' })}
+          ${U.field({ label: 'Nome do cliente', name: 'clienteNome', value: draft.clienteNome, placeholder: 'Ex.: Maria' })}
+          ${U.field({ label: 'Telefone / WhatsApp', name: 'clienteTelefone', value: draft.clienteTelefone, placeholder: 'Ex.: (27) 99999-1010', attrs: 'inputmode="tel" maxlength="20"', help: 'Opcional. É necessário somente para enviar mensagens.' })}
+          ${client ? `<div class="inline-note field-span2">${icon('telefone')}<span>Cadastro selecionado: ${esc(client.nome)} · ${esc(client.telefone || 'sem telefone')}</span></div>` : ''}
         </div>
-      `}
+      </div>
 
       <div class="form-section">
-        <div class="form-section-head"><span>2</span><div><h2>Veículo</h2><p>Escolha um veículo do cliente ou cadastre um novo.</p></div>${client ? `<button type="button" class="btn btn-small btn-secondary" data-action="osNewVehicle" data-id="${esc(client.id)}">${icon('plus')}Novo veículo</button>` : ''}</div>
+        <div class="form-section-head"><span>2</span><div><h2>Veículo (opcional)</h2><p>Escolha um cadastro, digite a placa e o veículo ou cadastre aqui somente se quiser.</p></div>${client ? `<button type="button" class="btn btn-small btn-secondary" data-action="osNewVehicle" data-id="${esc(client.id)}">${icon('plus')}Cadastrar veículo</button>` : ''}</div>
         <div class="form-grid">
-          ${U.selectField({ label: 'Veículo do cliente', name: 'veiculoId', value: draft.veiculoId, required: true, options: vehicles.map((vehicle) => ({ value: vehicle.id, label: `${vehicle.placa} · ${vehicleTitle(vehicle) || 'Veículo'}${vehicle.cor ? ` · ${vehicle.cor}` : ''}` })), placeholder: client ? 'Escolha o veículo' : 'Escolha o cliente primeiro', span: 2, attrs: client ? '' : 'disabled', help: vehicles.length ? 'A placa e a descrição serão copiadas para a O.S.' : client ? 'Este cliente ainda não tem veículo. Use o botão Novo veículo.' : '' })}
+          ${U.selectField({ label: 'Veículo cadastrado', name: 'veiculoId', value: draft.veiculoId, options: vehicles.map((vehicle) => ({ value: vehicle.id, label: `${vehicle.placa} · ${vehicleTitle(vehicle) || 'Veículo'}${vehicle.cor ? ` · ${vehicle.cor}` : ''}` })), placeholder: client ? 'Não cadastrar veículo' : 'Selecione um cliente para listar', span: 2, attrs: `data-os-vehicle${client ? '' : ' disabled'}`, help: 'Você pode deixar todos os campos do veículo em branco.' })}
+          ${U.field({ label: 'Placa', name: 'veiculoPlaca', value: draft.veiculoPlaca, placeholder: 'Ex.: ABC1D23', attrs: 'maxlength="8" autocapitalize="characters"' })}
+          ${U.field({ label: 'Veículo / modelo', name: 'veiculoDescricao', value: draft.veiculoDescricao, placeholder: 'Ex.: Volkswagen Gol' })}
           ${U.field({ label: 'KM atual', name: 'km', value: draft.km, placeholder: 'Ex.: 128400', help: 'Quilometragem informada na entrada.', attrs: 'inputmode="numeric" maxlength="10"' })}
         </div>
       </div>
@@ -635,13 +675,13 @@ function osStepOne(draft) {
 }
 
 function osStepTwo(draft) {
-  const client = S.clienteById(draft.clienteId);
-  const vehicle = S.veiculoById(draft.veiculoId);
   const totals = S.computeOrderTotals(draft.itens || [], 0);
+  const clientName = draft.clienteNome || S.clienteById(draft.clienteId)?.nome || 'Cliente não informado';
+  const vehicleLabel = [draft.veiculoDescricao, draft.veiculoPlaca].filter(Boolean).join(' · ') || 'Veículo não informado';
   return `
     <header class="form-page-head">
       <div><span class="eyebrow">Passo 2 de 3</span><h1>Quais peças e serviços?</h1><p>Adicione cada item. O sistema calcula o total automaticamente.</p></div>
-      <div class="selected-entity">${U.avatar(client?.nome || '?')}<div><small>Cliente e veículo</small><strong>${esc(client?.nome || '')}</strong><span>${esc(vehicleTitle(vehicle))}${vehicle?.placa ? ` · ${esc(vehicle.placa)}` : ''}</span></div><button type="button" class="btn btn-small btn-secondary" data-action="osBack">${icon('editar')}Alterar</button></div>
+      <div class="selected-entity">${U.avatar(clientName)}<div><small>Cliente e veículo</small><strong>${esc(clientName)}</strong><span>${esc(vehicleLabel)}</span></div><button type="button" class="btn btn-small btn-secondary" data-action="osBack">${icon('editar')}Alterar</button></div>
     </header>
     <div class="os-items-layout">
       <section class="card">
@@ -688,18 +728,18 @@ function osItemCard(item, index) {
 }
 
 function osStepThree(draft) {
-  const client = S.clienteById(draft.clienteId);
-  const vehicle = S.veiculoById(draft.veiculoId);
   const totals = S.computeOrderTotals(draft.itens || [], draft.desconto);
-  const phone = client?.telefone || '';
+  const clientName = draft.clienteNome || S.clienteById(draft.clienteId)?.nome || 'Cliente não informado';
+  const phone = draft.clienteTelefone || S.clienteById(draft.clienteId)?.telefone || '';
+  const vehicleLabel = [draft.veiculoDescricao, draft.veiculoPlaca].filter(Boolean).join(' · ') || 'Veículo não informado';
   return `
     <header class="form-page-head">
       <div><span class="eyebrow">Passo 3 de 3</span><h1>Revise e salve a O.S.</h1><p>Confira os dados, escolha o status e salve. Depois você poderá enviar o orçamento pelo WhatsApp.</p></div>
     </header>
     <form class="form-card" data-form="osSave">
       <section class="review-summary">
-        <div><span>Cliente</span><strong>${esc(client?.nome || '')}</strong><small>${esc(phone || 'Sem telefone')}</small></div>
-        <div><span>Veículo</span><strong>${esc(vehicleTitle(vehicle) || '')}</strong><small>${esc(vehicle?.placa || '')}</small></div>
+        <div><span>Cliente</span><strong>${esc(clientName)}</strong><small>${esc(phone || 'Sem telefone')}</small></div>
+        <div><span>Veículo</span><strong>${esc(vehicleLabel)}</strong><small>Opcional</small></div>
         <div><span>Itens</span><strong>${(draft.itens || []).length} item(ns)</strong><small>${esc(money(totals.totalPecas + totals.totalMaoObra))}</small></div>
         <button type="button" class="btn btn-small btn-secondary" data-action="osBackTwo">${icon('editar')}Alterar itens</button>
       </section>
@@ -731,7 +771,7 @@ function osStepThree(draft) {
       <div class="form-actions">
         <button type="button" class="btn btn-ghost" data-action="osBackTwo">${icon('voltar')}Voltar</button>
         <div class="form-actions-right">
-          ${phone && draft.itens.length ? `<button type="submit" name="intent" value="send" class="btn btn-whatsapp">${icon('whatsapp')}Salvar e enviar no WhatsApp</button>` : ''}
+          ${phoneLooksValid(phone) && draft.itens.length ? `<button type="submit" name="intent" value="send" class="btn btn-whatsapp">${icon('whatsapp')}Salvar e enviar no WhatsApp</button>` : ''}
           <button type="submit" name="intent" value="save" class="btn btn-primary btn-large">${icon('check')}Salvar O.S.</button>
         </div>
       </div>
@@ -872,7 +912,7 @@ function clientsView() {
     <div class="page-wrap">
       ${U.pageHead({
         title: 'Clientes',
-        subtitle: 'Cadastre as pessoas e os veículos para agilizar as próximas ordens de serviço.',
+        subtitle: 'Cadastro opcional para reutilizar dados nas próximas ordens de serviço.',
         help: 'clientes',
         actions: `<button type="button" class="btn btn-primary" data-action="newClient">${icon('plus')}Novo cliente</button>`
       })}
@@ -910,7 +950,7 @@ function renderClientsList() {
   const clients = filteredClients();
   if (!clients.length) return U.emptyState({
     iconName: 'clientes', title: 'Nenhum cliente encontrado',
-    text: S.store.data.clientes.length ? 'Tente outra busca.' : 'Cadastre o primeiro cliente e o veículo.',
+    text: S.store.data.clientes.length ? 'Tente outra busca.' : 'O cadastro é opcional. Você pode abrir uma O.S. sem cliente.',
     action: S.store.data.clientes.length ? '' : `<button type="button" class="btn btn-primary" data-action="newClient">${icon('plus')}Cadastrar cliente</button>`
   });
   return `<div class="client-grid">${clients.map((client) => {
@@ -927,7 +967,7 @@ function renderClientsList() {
         ${vehicles.length ? `<div class="vehicle-tags">${vehicles.map((vehicle) => `<span>${icon('carro')}${esc(vehicle.placa)}<small>${esc(vehicleTitle(vehicle))}</small></span>`).join('')}</div>` : ''}
         ${client.observacoes ? `<p class="client-notes">${esc(client.observacoes)}</p>` : ''}
         <div class="client-actions">
-          <button type="button" class="btn btn-small btn-whatsapp" data-action="clientWhatsApp" data-id="${esc(client.id)}">${icon('whatsapp')}WhatsApp</button>
+          ${client.telefone ? `<button type="button" class="btn btn-small btn-whatsapp" data-action="clientWhatsApp" data-id="${esc(client.id)}">${icon('whatsapp')}WhatsApp</button>` : ''}
           <button type="button" class="btn btn-small btn-secondary" data-action="clientVehicles" data-id="${esc(client.id)}">${icon('carro')}Veículos (${vehicles.length})</button>
           <button type="button" class="btn btn-small btn-ghost" data-action="editClient" data-id="${esc(client.id)}">${icon('editar')}Editar</button>
           <button type="button" class="icon-button danger-icon" data-action="deleteClient" data-id="${esc(client.id)}" aria-label="Excluir ${esc(client.nome)}">${icon('lixeira')}</button>
@@ -1230,9 +1270,9 @@ function financeView() {
 function receivableRow(order) {
   return `
     <article class="finance-row">
-      <div class="finance-row-main"><strong>${esc(order.clienteNome)}</strong><span>${esc(order.numero)} · ${esc(order.veiculoDescricao || 'Veículo')}</span><small>Faturada em ${esc(fmtDate(order.dataFaturamento))}</small></div>
+      <div class="finance-row-main"><strong>${esc(order.clienteNome || 'Cliente não informado')}</strong><span>${esc(order.numero)} · ${esc(order.veiculoDescricao || 'Veículo não informado')}</span><small>Faturada em ${esc(fmtDate(order.dataFaturamento))}</small></div>
       <strong class="finance-row-value">${esc(money(order.total))}</strong>
-      <div class="table-actions"><button type="button" class="btn btn-small btn-whatsapp" data-action="chargeWhatsApp" data-id="${esc(order.id)}">${icon('whatsapp')}Cobrar</button><button type="button" class="btn btn-small btn-success" data-action="orderPay" data-id="${esc(order.id)}">${icon('check')}Receber</button></div>
+      <div class="table-actions">${S.clientePhone(order) ? `<button type="button" class="btn btn-small btn-whatsapp" data-action="chargeWhatsApp" data-id="${esc(order.id)}">${icon('whatsapp')}Cobrar</button>` : ''}<button type="button" class="btn btn-small btn-success" data-action="orderPay" data-id="${esc(order.id)}">${icon('check')}Receber</button></div>
     </article>
   `;
 }
@@ -1271,7 +1311,17 @@ function helpView(path) {
       <section class="backup-card">
         <div class="backup-copy">
           <span class="backup-icon">${icon('banco')}</span>
-          <div><h2>Cópia de segurança</h2><p>Seus dados ficam neste navegador. Baixe uma cópia toda semana e sempre que trocar de computador.</p><small>${lastBackup ? `Última cópia: ${esc(fmtDateTime(lastBackup))}` : 'Você ainda não fez uma cópia.'} · ${data.clientes.length} cliente(s) · ${data.ordens.length} O.S. · ${data.pecas.length} peça(s)</small></div>
+          <div><h2>Conta e sincronização</h2><p>Conectado como <strong>${esc(syncSnapshot?.user?.email || '')}</strong>. Os dados são salvos na nuvem e ficam em cache neste dispositivo para uso sem internet.</p><small>${U.syncBadge(syncSnapshot)}${syncSnapshot?.message ? ` · ${esc(syncSnapshot.message)}` : ''}</small></div>
+        </div>
+        <div class="backup-actions">
+          <button type="button" class="btn btn-secondary" data-action="syncNow">${icon('relogio')}Sincronizar agora</button>
+          <button type="button" class="btn btn-danger-ghost btn-small" data-action="signOut">Sair da conta</button>
+        </div>
+      </section>
+      <section class="backup-card">
+        <div class="backup-copy">
+          <span class="backup-icon">${icon('banco')}</span>
+          <div><h2>Cópia de segurança</h2><p>Baixe uma cópia toda semana e antes de restaurar ou apagar dados. O arquivo contém informações da oficina e deve ser guardado em local seguro.</p><small>${lastBackup ? `Última cópia: ${esc(fmtDateTime(lastBackup))}` : 'Você ainda não fez uma cópia.'} · ${data.clientes.length} cliente(s) · ${data.ordens.length} O.S. · ${data.pecas.length} peça(s)</small></div>
         </div>
         <div class="backup-actions">
           <button type="button" class="btn btn-primary" data-action="exportBackup">${icon('baixar')}Baixar cópia</button>
@@ -1355,18 +1405,23 @@ function openClientModal(id = '') {
   const formId = 'form-cliente';
   U.openModal({
     title: client ? 'Editar cliente' : 'Cadastrar cliente',
-    subtitle: 'O telefone com DDD será usado para enviar mensagens pelo WhatsApp.',
+    subtitle: 'Cadastro opcional. Informe nome e telefone; o e-mail é opcional.',
     body: `<form id="${formId}" data-form="cliente" data-id="${esc(client?.id || '')}">
       <div class="modal-form-grid">
         ${U.field({ label: 'Nome completo / razão social', name: 'nome', value: client?.nome, required: true, span: 2, placeholder: 'Ex.: Maria Aparecida Souza' })}
-        ${U.selectField({ label: 'Tipo de cliente', name: 'tipo', value: client?.tipo || 'Pessoa Física', options: ['Pessoa Física', 'Pessoa Jurídica'] })}
-        ${U.field({ label: 'CPF / CNPJ', name: 'cpfCnpj', value: client?.cpfCnpj, placeholder: 'Somente números ou com pontuação' })}
-        ${U.field({ label: 'Telefone com DDD', name: 'telefone', value: client?.telefone, required: true, placeholder: 'Ex.: (11) 98765-4321', attrs: 'inputmode="tel" autocomplete="tel"', help: 'Necessário para o WhatsApp.' })}
-        ${U.field({ label: 'E-mail', name: 'email', type: 'email', value: client?.email, placeholder: 'cliente@email.com', attrs: 'autocomplete="email"' })}
-        ${U.field({ label: 'Endereço', name: 'endereco', value: client?.endereco, span: 2, placeholder: 'Rua, número e bairro' })}
-        ${U.field({ label: 'Cidade / UF', name: 'cidade', value: client?.cidade, span: 2, placeholder: 'Ex.: São Paulo / SP' })}
-        ${U.textareaField({ label: 'Observações', name: 'observacoes', value: client?.observacoes, rows: 3 })}
+        ${U.field({ label: 'Telefone / WhatsApp', name: 'telefone', value: client?.telefone, required: true, span: 2, placeholder: 'Ex.: (27) 99999-1010', attrs: 'inputmode="tel" autocomplete="tel"', help: 'Obrigatório. Use o DDD para preparar mensagens.' })}
       </div>
+      <details class="optional-details">
+        <summary>Dados adicionais (opcional)</summary>
+        <div class="modal-form-grid">
+          ${U.selectField({ label: 'Tipo de cliente', name: 'tipo', value: client?.tipo || 'Pessoa Física', options: ['Pessoa Física', 'Pessoa Jurídica'] })}
+          ${U.field({ label: 'CPF / CNPJ', name: 'cpfCnpj', value: client?.cpfCnpj, placeholder: 'Somente números ou com pontuação' })}
+          ${U.field({ label: 'E-mail', name: 'email', type: 'email', value: client?.email, placeholder: 'cliente@email.com', attrs: 'autocomplete="email"' })}
+          ${U.field({ label: 'Endereço', name: 'endereco', value: client?.endereco, placeholder: 'Rua, número e bairro' })}
+          ${U.field({ label: 'Cidade / UF', name: 'cidade', value: client?.cidade, placeholder: 'Ex.: Serra / ES' })}
+          ${U.textareaField({ label: 'Observações', name: 'observacoes', value: client?.observacoes, rows: 3 })}
+        </div>
+      </details>
     </form>`,
     footer: `<button type="button" class="btn btn-ghost" data-modal-close>Cancelar</button><button type="submit" form="${formId}" class="btn btn-primary">${icon('check')}Salvar cliente</button>`,
     size: 'lg'
@@ -1385,18 +1440,23 @@ function openVehicleModal(id = '', clientId = '', context = '') {
   const formId = 'form-veiculo';
   U.openModal({
     title: vehicle ? 'Editar veículo' : 'Cadastrar veículo',
-    subtitle: 'Informe a placa e os dados que aparecerão na ordem de serviço.',
+    subtitle: 'Cadastro opcional. Informe o cliente, a placa e a descrição do veículo.',
     body: `<form id="${formId}" data-form="veiculo" data-id="${esc(vehicle?.id || '')}">
       <div class="modal-form-grid">
         ${U.selectField({ label: 'Cliente', name: 'clienteId', value: selectedClient, required: true, options: clients.map((client) => ({ value: client.id, label: client.nome })), placeholder: 'Escolha o cliente', span: 2, attrs: vehicle ? '' : 'data-vehicle-client' })}
         ${U.field({ label: 'Placa', name: 'placa', value: vehicle?.placa, required: true, placeholder: 'Ex.: ABC1D23', attrs: 'maxlength="8" autocapitalize="characters"', help: 'A placa será salva em letras maiúsculas.' })}
-        ${U.field({ label: 'Marca', name: 'marca', value: vehicle?.marca, placeholder: 'Ex.: Volkswagen' })}
-        ${U.field({ label: 'Modelo', name: 'modelo', value: vehicle?.modelo, placeholder: 'Ex.: Gol 1.0' })}
-        ${U.field({ label: 'Ano', name: 'ano', value: vehicle?.ano, placeholder: 'Ex.: 2018', attrs: 'inputmode="numeric" maxlength="4"' })}
-        ${U.field({ label: 'Cor', name: 'cor', value: vehicle?.cor, placeholder: 'Ex.: Prata' })}
-        ${U.field({ label: 'Quilometragem atual', name: 'km', value: vehicle?.km, placeholder: 'Ex.: 128400', attrs: 'inputmode="numeric"' })}
-        ${U.textareaField({ label: 'Observações do veículo', name: 'observacoes', value: vehicle?.observacoes, rows: 3 })}
+        ${U.field({ label: 'Modelo / veículo', name: 'modelo', value: vehicle?.modelo, placeholder: 'Ex.: Gol 1.0' })}
       </div>
+      <details class="optional-details">
+        <summary>Outros dados do veículo (opcional)</summary>
+        <div class="modal-form-grid">
+          ${U.field({ label: 'Marca', name: 'marca', value: vehicle?.marca, placeholder: 'Ex.: Volkswagen' })}
+          ${U.field({ label: 'Ano', name: 'ano', value: vehicle?.ano, placeholder: 'Ex.: 2018', attrs: 'inputmode="numeric" maxlength="4"' })}
+          ${U.field({ label: 'Cor', name: 'cor', value: vehicle?.cor, placeholder: 'Ex.: Prata' })}
+          ${U.field({ label: 'Quilometragem atual', name: 'km', value: vehicle?.km, placeholder: 'Ex.: 128400', attrs: 'inputmode="numeric"' })}
+          ${U.textareaField({ label: 'Observações do veículo', name: 'observacoes', value: vehicle?.observacoes, rows: 3 })}
+        </div>
+      </details>
     </form>`,
     footer: `<button type="button" class="btn btn-ghost" data-modal-close>Cancelar</button><button type="submit" form="${formId}" class="btn btn-primary">${icon('check')}Salvar veículo</button>`,
     size: 'lg'
@@ -1788,7 +1848,7 @@ function orderWhatsAppMessage(order, template) {
   } else if (template === 'cobranca') {
     text = `Olá, ${firstName}! Aqui é a Franlin Car Veículos.\n\nEstamos entrando em contato sobre a O.S. ${order.numero}, faturada em ${fmtDate(order.dataFaturamento)}.\n\nValor em aberto: ${money(order.total)}${order.formaPagamento ? `\nForma combinada: ${order.formaPagamento}` : ''}\n\nEntre em contato conosco para confirmar o pagamento. Obrigado!`;
   } else if (template === 'pronta') {
-    text = `Olá, ${firstName}! Aqui é a Franlin Car Veículos.\n\nBoas notícias: a O.S. ${order.numero}${vehicle ? ` do veículo ${vehicle}` : ''} está finalizada e o veículo está pronto para retirada.\n\n${total}${!order.pago ? '\nPagamento: aguardando.' : `\nPagamento recebido em ${fmtDate(order.dataPagamento)}.`}\n\nCombine o horário de retirada conosco. Obrigado!`;
+    text = `Olá, ${firstName}! Aqui é a Franlin Car Veículos.\n\nBoas notícias: a O.S. ${order.numero}${vehicle ? ` do veículo ${vehicle}` : ''} está finalizada e o serviço está pronto para retirada.\n\n${total}${!order.pago ? '\nPagamento: aguardando.' : `\nPagamento recebido em ${fmtDate(order.dataPagamento)}.`}\n\nCombine o horário de retirada conosco. Obrigado!`;
   } else if (template === 'cancelada') {
     text = `Olá, ${firstName}! Aqui é a Franlin Car Veículos.\n\nInformamos que a O.S. ${order.numero} foi cancelada. Se houver peças que já haviam sido separadas, o estoque foi ajustado.\n\nSe precisar de mais informações, entre em contato conosco. Obrigado!`;
   } else {
@@ -1844,7 +1904,7 @@ function printableOrder(order) {
   const items = order.itens || [];
   return `
     <section class="print-section"><h2>Dados do cliente e do veículo</h2><div class="print-info-grid">
-      <div><span>Cliente</span><strong>${esc(order.clienteNome)}</strong></div>
+      <div><span>Cliente</span><strong>${esc(order.clienteNome || 'Não informado')}</strong></div>
       <div><span>CPF / CNPJ</span><strong>${esc(order.clienteDocumento || '—')}</strong></div>
       <div><span>Telefone</span><strong>${esc(S.clientePhone(order) || '—')}</strong></div>
       <div><span>Veículo</span><strong>${esc(order.veiculoDescricao || '—')}</strong></div>
@@ -1896,7 +1956,7 @@ async function readBackupFile(input) {
     }
     const confirmed = await U.confirmDialog({
       title: 'Restaurar esta cópia?',
-      message: 'Os dados atuais deste navegador serão substituídos pelos dados do arquivo. Baixe uma cópia dos dados atuais antes de continuar.',
+      message: 'Os dados atuais da conta serão substituídos pelos dados do arquivo e a alteração será enviada para a nuvem. Baixe uma cópia dos dados atuais antes de continuar.',
       confirmText: 'Sim, restaurar cópia',
       tone: 'danger'
     });
@@ -1933,7 +1993,7 @@ async function loadDemoData() {
 async function clearAllData() {
   const first = await U.confirmDialog({
     title: 'Apagar todos os dados?',
-    message: 'Clientes, veículos, peças, ordens, compras, despesas e todo o histórico deste navegador serão apagados. Esta ação não pode ser desfeita.',
+    message: 'Clientes, veículos, peças, ordens, compras, despesas e todo o histórico desta conta serão apagados da nuvem e deste dispositivo. Esta ação não pode ser desfeita.',
     confirmText: 'Continuar',
     tone: 'danger'
   });
@@ -1950,7 +2010,121 @@ async function clearAllData() {
   purchaseDraft = null;
   manualCache = '';
   navigate('#/');
-  U.toast('Todos os dados deste navegador foram apagados.', 'info');
+  U.toast('Todos os dados da conta foram apagados. A alteração será sincronizada.', 'info');
+}
+
+function expireWorkspace(message = 'Sua sessão expirou. Entre novamente para continuar.') {
+  syncManager?.destroy();
+  syncManager = null;
+  syncSnapshot = null;
+  authClient?.clearSession();
+  S.useLocalStorage();
+  osDraft = null;
+  purchaseDraft = null;
+  authMode = 'login';
+  authNotice = '';
+  authError = message;
+  booting = false;
+  render();
+}
+
+async function openWorkspace() {
+  booting = true;
+  render();
+  syncManager?.destroy();
+  const manager = new SyncManager(authClient);
+  syncManager = manager;
+  try {
+    await manager.start();
+    if (manager.authExpired) {
+      expireWorkspace(manager.message);
+      return;
+    }
+    manager.attachStore();
+    manager.subscribe((snapshot) => {
+      syncSnapshot = snapshot;
+      if (!booting && snapshot.status === 'auth') expireWorkspace(snapshot.message);
+      else if (!booting) render();
+    });
+    syncSnapshot = manager.snapshot();
+    booting = false;
+    render();
+  } catch (error) {
+    manager.destroy();
+    if (syncManager === manager) syncManager = null;
+    syncSnapshot = null;
+    S.useLocalStorage();
+    booting = false;
+    throw error;
+  }
+}
+
+async function submitAuth(form) {
+  const mode = form.dataset.auth;
+  const values = formValues(form);
+  authEmail = String(values.email || '').trim();
+  authError = '';
+  authNotice = '';
+  try {
+    if (!authConfigured || !authClient) throw new Error('A conexão com a nuvem ainda não foi configurada.');
+    if (mode === 'recover') {
+      await authClient.recoverPassword(authEmail);
+      authNotice = 'Se o e-mail estiver cadastrado, você receberá um link para redefinir a senha. Confira também a caixa de spam.';
+      render();
+      return;
+    }
+    if (mode === 'signup' && values.password !== values.passwordConfirm) throw new Error('As senhas não são iguais. Digite novamente.');
+    if (mode === 'signup') {
+      const session = await authClient.signUp(authEmail, values.password, Boolean(values.remember));
+      if (!session?.access_token) {
+        authNotice = 'Conta criada. Confirme o link enviado ao e-mail e depois entre com sua senha.';
+        authMode = 'login';
+        render();
+        return;
+      }
+    } else {
+      await authClient.signIn(authEmail, values.password, Boolean(values.remember));
+    }
+    await openWorkspace();
+  } catch (error) {
+    authError = error.message || 'Não foi possível concluir o acesso.';
+    render();
+  }
+}
+
+async function signOut() {
+  const pending = syncManager?.outboxPending;
+  if (pending) {
+    const confirmed = await U.confirmDialog({
+      title: 'Sair com alterações pendentes?',
+      message: 'Há alterações ainda não enviadas. Elas continuarão guardadas neste dispositivo e serão enviadas quando você entrar novamente com a mesma conta.',
+      confirmText: 'Sair e manter pendentes',
+      tone: 'danger'
+    });
+    if (!confirmed) return;
+  }
+  syncManager?.destroy();
+  syncManager = null;
+  syncSnapshot = null;
+  try { await authClient?.signOut(); } catch { /* A sessão local será encerrada mesmo sem conexão. */ }
+  S.useLocalStorage();
+  osDraft = null;
+  purchaseDraft = null;
+  authMode = 'login';
+  authError = '';
+  authNotice = '';
+  render();
+}
+
+async function resolveSync(useDevice) {
+  try {
+    if (useDevice) await syncManager.resolveUseDevice();
+    else await syncManager.resolveCloud();
+    refresh();
+  } catch (error) {
+    if (error?.name === 'SupabaseAuthError' && [401, 403].includes(error.status)) expireWorkspace(error.message);
+    else U.toast(error.message || 'Não foi possível resolver o conflito.', 'error');
+  }
 }
 
 async function submitForm(form, submitter = null) {
@@ -1963,11 +2137,15 @@ async function submitForm(form, submitter = null) {
       if (currentRoute() === '/ordens/nova' || /^\/ordens\/[^/]+\/editar$/.test(currentRoute())) {
         if (osDraft) {
           osDraft.clienteId = client.id;
+          osDraft.clienteNome = client.nome;
+          osDraft.clienteTelefone = client.telefone;
           osDraft.veiculoId = '';
+          osDraft.veiculoPlaca = '';
+          osDraft.veiculoDescricao = '';
         }
+        vehicleReturnClient = '';
         refresh();
-        U.toast('Cliente salvo. Agora cadastre o veículo.');
-        setTimeout(() => openVehicleModal('', client.id, `os:${client.id}`), 60);
+        U.toast('Cliente salvo e selecionado. O veículo é opcional.');
       } else {
         refresh();
         U.toast('Cliente salvo com sucesso.');
@@ -1981,7 +2159,10 @@ async function submitForm(form, submitter = null) {
       if (context.startsWith('os:')) {
         if (osDraft) {
           osDraft.clienteId = vehicle.clienteId;
+          osDraft.clienteNome = S.clienteById(vehicle.clienteId)?.nome || osDraft.clienteNome || '';
           osDraft.veiculoId = vehicle.id;
+          osDraft.veiculoPlaca = vehicle.placa;
+          osDraft.veiculoDescricao = vehicleTitle(vehicle);
         }
         refresh();
         U.toast('Veículo salvo e selecionado na O.S.');
@@ -2097,15 +2278,23 @@ async function submitForm(form, submitter = null) {
       refresh();
       U.toast('Serviço atualizado na O.S.');
     } else if (kind === 'osStep1') {
-      if (!values.clienteId) throw new Error('Escolha o cliente.');
-      const vehicle = S.veiculoById(values.veiculoId);
-      if (!vehicle || vehicle.clienteId !== values.clienteId) throw new Error('Escolha um veículo que pertença ao cliente selecionado.');
-      Object.assign(osDraft, values, { step: 2 });
+      const client = values.clienteId ? S.clienteById(values.clienteId) : null;
+      if (values.clienteId && !client) throw new Error('O cliente selecionado não foi encontrado.');
+      const vehicle = values.veiculoId ? S.veiculoById(values.veiculoId) : null;
+      if (values.veiculoId && (!vehicle || (client && vehicle.clienteId !== client.id))) throw new Error('Confira o veículo selecionado.');
+      Object.assign(osDraft, values, {
+        step: 2,
+        clienteNome: values.clienteNome || client?.nome || '',
+        clienteTelefone: values.clienteTelefone || client?.telefone || '',
+        veiculoPlaca: values.veiculoPlaca || vehicle?.placa || '',
+        veiculoDescricao: values.veiculoDescricao || (vehicle ? vehicleTitle(vehicle) : '')
+      });
       refresh();
     } else if (kind === 'osSave') {
       const client = S.clienteById(osDraft.clienteId);
       const vehicle = S.veiculoById(osDraft.veiculoId);
-      if (!client || !vehicle || vehicle.clienteId !== client.id) throw new Error('Confira o cliente e o veículo antes de salvar.');
+      if (osDraft.clienteId && !client) throw new Error('O cliente selecionado não foi encontrado.');
+      if (osDraft.veiculoId && (!vehicle || (client && vehicle.clienteId !== client.id))) throw new Error('Confira o veículo selecionado.');
       if (!osDraft.itens.length) throw new Error('Adicione pelo menos uma peça ou um serviço antes de salvar.');
       if (Number(values.desconto) > S.computeOrderTotals(osDraft.itens).total) throw new Error('O desconto não pode ser maior que o total dos itens.');
       const pago = values.status === 'Faturada' && values.pago === 'on';
@@ -2113,12 +2302,12 @@ async function submitForm(form, submitter = null) {
         ...osDraft,
         ...values,
         pago,
-        clienteNome: client.nome,
-        clienteTelefone: client.telefone,
-        clienteDocumento: client.cpfCnpj,
-        clienteEndereco: [client.endereco, client.cidade].filter(Boolean).join(' · '),
-        veiculoPlaca: vehicle.placa,
-        veiculoDescricao: vehicleTitle(vehicle)
+        clienteNome: osDraft.clienteNome || client?.nome || '',
+        clienteTelefone: osDraft.clienteTelefone || client?.telefone || '',
+        clienteDocumento: client?.cpfCnpj || '',
+        clienteEndereco: client ? [client.endereco, client.cidade].filter(Boolean).join(' · ') : '',
+        veiculoPlaca: osDraft.veiculoPlaca || vehicle?.placa || '',
+        veiculoDescricao: osDraft.veiculoDescricao || (vehicle ? vehicleTitle(vehicle) : '')
       });
       const send = submitter?.value === 'send';
       osDraft = null;
@@ -2136,8 +2325,13 @@ async function submitForm(form, submitter = null) {
 function openOrderWhatsApp(id, template = '') {
   const order = S.ordemById(id);
   if (!order) return;
+  const phone = S.clientePhone(order);
+  if (!phoneLooksValid(phone)) {
+    U.toast('Informe um telefone com DDD na O.S. para enviar mensagens.', 'error');
+    return;
+  }
   const selectedTemplate = template || (order.status === 'Orçamento' ? 'orcamento' : order.status === 'Cancelada' ? 'cancelada' : order.status === 'Faturada' ? 'pronta' : 'andamento');
-  openWhatsAppModal(S.clientePhone(order), 'Mensagem para o cliente', orderWhatsAppMessage(order, selectedTemplate));
+  openWhatsAppModal(phone, 'Mensagem para o cliente', orderWhatsAppMessage(order, selectedTemplate));
 }
 
 function openClientWhatsApp(id) {
@@ -2367,6 +2561,21 @@ document.addEventListener('click', async (event) => {
   const id = trigger.dataset.id || '';
   try {
     switch (action) {
+      case 'authMode':
+        authMode = trigger.dataset.mode || 'login';
+        authEmail = document.querySelector('form[data-auth] [name="email"]')?.value || authEmail;
+        authError = '';
+        authNotice = '';
+        render();
+        break;
+      case 'signOut': await signOut(); break;
+      case 'resolveCloud': await resolveSync(false); break;
+      case 'resolveDevice': await resolveSync(true); break;
+      case 'syncNow':
+        if (syncManager?.outboxPending) await syncManager.push();
+        else await syncManager?.pull();
+        refresh();
+        break;
       case 'fontDown':
         fontScale = Math.max(1, fontScale - 1);
         localStorage.setItem('fcv.fontScale', String(fontScale));
@@ -2437,7 +2646,7 @@ document.addEventListener('click', async (event) => {
       case 'chargeWhatsApp': openOrderWhatsApp(id, 'cobranca'); break;
       case 'orderPrint': {
         const order = S.ordemById(id);
-        if (order) printDocument({ title: `Ordem de Serviço ${order.numero}`, subtitle: `${order.clienteNome} · ${order.status}`, content: printableOrder(order) });
+        if (order) printDocument({ title: `Ordem de Serviço ${order.numero}`, subtitle: `${order.clienteNome || 'Cliente não informado'} · ${order.status}`, content: printableOrder(order) });
         break;
       }
       case 'orderApprove': await changeOrderStatus(id, 'Aprovada'); break;
@@ -2526,8 +2735,14 @@ document.addEventListener('click', async (event) => {
 });
 
 document.addEventListener('submit', (event) => {
-  const form = event.target.closest('form[data-form]');
+  const form = event.target.closest('form');
   if (!form) return;
+  if (form.dataset.auth) {
+    event.preventDefault();
+    submitAuth(form);
+    return;
+  }
+  if (!form.dataset.form) return;
   event.preventDefault();
   submitForm(form, event.submitter);
 });
@@ -2563,8 +2778,25 @@ document.addEventListener('change', (event) => {
     return;
   }
   if (target.matches('[data-os-client]')) {
-    Object.assign(osDraft, formValues(target.form));
-    osDraft.veiculoId = '';
+    const values = formValues(target.form);
+    const client = S.clienteById(values.clienteId);
+    Object.assign(osDraft, values, {
+      clienteNome: client?.nome || values.clienteNome || '',
+      clienteTelefone: client ? client.telefone : values.clienteTelefone || '',
+      veiculoId: '',
+      veiculoPlaca: '',
+      veiculoDescricao: ''
+    });
+    refresh();
+    return;
+  }
+  if (target.matches('[data-os-vehicle]')) {
+    const values = formValues(target.form);
+    const vehicle = S.veiculoById(values.veiculoId);
+    Object.assign(osDraft, values, {
+      veiculoPlaca: vehicle?.placa || values.veiculoPlaca || '',
+      veiculoDescricao: vehicle ? vehicleTitle(vehicle) : values.veiculoDescricao || ''
+    });
     refresh();
     return;
   }
@@ -2594,14 +2826,44 @@ window.addEventListener('hashchange', () => {
   render();
 });
 
-window.addEventListener('storage', (event) => {
-  if (event.key !== STORAGE_KEY) return;
-  S.reload();
-  osDraft = null;
-  purchaseDraft = null;
-  refresh();
-  U.toast('Os dados foram atualizados por outra aba deste navegador.', 'info');
+window.addEventListener('online', () => {
+  if (syncManager) {
+    syncSnapshot = syncManager.snapshot();
+    syncManager.push();
+  }
 });
 
-if (!location.hash) history.replaceState(null, '', `${location.pathname}${location.search}#/`);
-render();
+window.addEventListener('offline', () => {
+  if (syncManager) syncManager.setStatus('offline', 'Sem conexão. As alterações continuam guardadas neste dispositivo.');
+});
+
+window.addEventListener('focus', () => syncManager?.pull());
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') syncManager?.pull();
+});
+
+async function bootstrap() {
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('./sw.js').catch((error) => console.warn('Não foi possível ativar o uso offline.', error));
+  }
+  try {
+    const config = await loadConfig();
+    authConfigured = Boolean(config);
+    if (config) {
+      authClient = new SupabaseClient(config);
+      try {
+        await authClient.restoreSession();
+      } catch (error) {
+        authError = error.message || 'Não foi possível restaurar a sessão. Entre novamente.';
+      }
+      if (authClient.user) await openWorkspace();
+    }
+  } finally {
+    booting = false;
+    render();
+  }
+}
+
+if (!location.hash) history.replaceState(null, '', `${location.pathname}${location.search}#/ordens`);
+bootstrap();

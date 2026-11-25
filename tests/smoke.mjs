@@ -99,12 +99,12 @@ function makePart(overrides = {}) {
 
 function makeOrder({ client, vehicle, part, status = 'Orçamento', items, desconto = 0, pago = false, ...overrides }) {
   return S.saveOrder({
-    clienteId: client.id,
-    clienteNome: client.nome,
-    clienteTelefone: client.telefone,
-    veiculoId: vehicle.id,
-    veiculoPlaca: vehicle.placa,
-    veiculoDescricao: `${vehicle.marca} ${vehicle.modelo}`,
+    clienteId: client?.id || '',
+    clienteNome: client?.nome || '',
+    clienteTelefone: client?.telefone || '',
+    veiculoId: vehicle?.id || '',
+    veiculoPlaca: vehicle?.placa || '',
+    veiculoDescricao: vehicle ? `${vehicle.marca} ${vehicle.modelo}` : '',
     status,
     problemaRelatado: 'Problema de teste',
     itens: items ?? [
@@ -185,6 +185,44 @@ test('ui: manual fica no final do menu e da página de ajuda', () => {
   assert.doesNotMatch(source, /setTimeout\(loadManualIntoPage/);
 });
 
+test('ui: O.S. é prioridade e cliente e veículo são opcionais', () => {
+  assert.equal(UI.NAV_GROUPS[0].items[0].key, 'ordens');
+  assert.equal(UI.NAV_GROUPS.at(-1).items[0].key, 'clientes');
+  const shell = UI.shell({ path: '/ordens', content: '<p>Ordens</p>' });
+  assert.match(shell, /class="brand" href="#\/ordens"/);
+  assert.ok(shell.indexOf('Ordens de serviço') < shell.indexOf('Painel'));
+
+  const source = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+  const draft = source.slice(source.indexOf('function blankOsDraft()'), source.indexOf('function ensureOsDraft()'));
+  for (const field of ['clienteNome', 'clienteTelefone', 'veiculoPlaca', 'veiculoDescricao']) {
+    assert.ok(draft.includes(`${field}: ''`), `Campo opcional ausente no rascunho: ${field}`);
+  }
+  const stepOne = source.slice(source.indexOf('function osStepOne('), source.indexOf('function osStepTwo('));
+  assert.match(stepOne, /Cliente \(opcional\)/);
+  assert.match(stepOne, /Veículo \(opcional\)/);
+  assert.match(stepOne, /Cadastrar cliente/);
+  assert.match(stepOne, /Cadastrar veículo/);
+  assert.match(stepOne, /name: 'clienteNome'/);
+  assert.match(stepOne, /name: 'clienteTelefone'/);
+  assert.match(stepOne, /name: 'veiculoPlaca'/);
+  assert.match(stepOne, /name: 'veiculoDescricao'/);
+  assert.doesNotMatch(stepOne, /required: true/);
+  assert.doesNotMatch(stepOne, /Sem cliente não é possível abrir uma O.S./);
+  assert.doesNotMatch(source, /Cliente salvo\. Agora cadastre o veículo\./);
+  const orderActions = source.slice(source.indexOf('function nextOrderActions('), source.indexOf('function blankOsDraft()'));
+  assert.match(orderActions, /const canSendWhatsApp = phoneLooksValid\(phone\)/);
+  const review = source.slice(source.indexOf('function osStepThree('), source.indexOf('function stockView('));
+  assert.match(review, /phoneLooksValid\(phone\) && draft\.itens\.length/);
+
+  const clientModal = source.slice(source.indexOf('function openClientModal('), source.indexOf('function openVehicleModal('));
+  assert.match(clientModal, /Dados adicionais \(opcional\)/);
+  assert.match(clientModal, /Informe nome e telefone; o e-mail é opcional/);
+  assert.match(clientModal, /label: 'Telefone \/ WhatsApp'[^\n]*required: true/);
+  assert.doesNotMatch(clientModal, /label: 'E-mail'[^\n]*required: true/);
+  const vehicleModal = source.slice(source.indexOf('function openVehicleModal('), source.indexOf('function openVehiclesModal('));
+  assert.match(vehicleModal, /Outros dados do veículo \(opcional\)/);
+});
+
 test('interface: tema claro e versões sincronizadas', () => {
   const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
   assert.match(css, /color-scheme:\s*light/);
@@ -256,6 +294,7 @@ test('store: dados de exemplo e bloqueio em base não vazia', () => {
 
 test('store: CRUD de cliente e veículo', () => {
   assert.throws(() => S.saveCliente({ nome: ' ' }), /Informe o nome do cliente/);
+  assert.throws(() => S.saveCliente({ nome: 'Maria Teste', telefone: ' ' }), /Informe o telefone do cliente/);
   const client = makeClient({ nome: '  Maria Teste  ' });
   assert.equal(client.nome, 'Maria Teste');
   assert.equal(S.store.data.clientes.length, 1);
@@ -324,6 +363,60 @@ test('store: orçamento, totais, desconto e número único', () => {
   const edited = S.saveOrder({ ...order, desconto: 20 });
   assert.equal(edited.total, 230);
   assert.equal(S.pecaById(part.id).quantidadeEstoque, 10);
+});
+
+test('store: O.S. pode ser salva sem cliente e veículo', () => {
+  const part = makePart();
+  const order = S.saveOrder({
+    status: 'Aprovada',
+    problemaRelatado: 'Revisão solicitada no balcão',
+    itens: [{ tipo: 'peca', pecaId: part.id, descricao: part.nome, quantidade: 1, valorUnitario: 100 }]
+  });
+  assert.equal(order.clienteId, '');
+  assert.equal(order.clienteNome, '');
+  assert.equal(order.veiculoId, '');
+  assert.equal(order.veiculoPlaca, '');
+  assert.equal(order.estoqueBaixado, true);
+  assert.equal(S.pecaById(part.id).quantidadeEstoque, 9);
+  assert.match(S.store.data.movimentacoes[0].referencia, /Cliente não informado/);
+  S.deleteOrder(order.id);
+  assert.equal(S.pecaById(part.id).quantidadeEstoque, 10);
+});
+
+test('store: O.S. guarda identificação simples sem cadastro', () => {
+  const order = S.saveOrder({
+    clienteNome: 'Maria do Balcão',
+    clienteTelefone: '(27) 99999-1010',
+    veiculoPlaca: 'abc1d23',
+    veiculoDescricao: 'Volkswagen Gol',
+    itens: [{ tipo: 'mao_obra', descricao: 'Diagnóstico', quantidade: 1, valorUnitario: 80 }]
+  });
+  assert.equal(order.clienteId, '');
+  assert.equal(order.veiculoId, '');
+  assert.equal(order.clienteNome, 'Maria do Balcão');
+  assert.equal(order.veiculoPlaca, 'ABC1D23');
+  assert.equal(S.clientePhone(order), '(27) 99999-1010');
+  assert.equal(S.store.data.clientes.length, 0);
+  assert.equal(S.store.data.veiculos.length, 0);
+});
+
+test('store: telefone salvo na O.S. tem prioridade sobre o cadastro', () => {
+  const client = makeClient({ telefone: '(27) 99999-1010' });
+  const order = S.saveOrder({
+    clienteId: client.id,
+    clienteNome: client.nome,
+    clienteTelefone: '(27) 98888-2020',
+    itens: [{ tipo: 'mao_obra', descricao: 'Diagnóstico', quantidade: 1, valorUnitario: 80 }]
+  });
+  assert.equal(S.clientePhone(order), '(27) 98888-2020');
+  S.saveCliente({ ...client, telefone: '(27) 97777-3030' });
+  assert.equal(S.clientePhone(order), '(27) 98888-2020');
+  const legacyOrder = S.saveOrder({
+    clienteId: client.id,
+    clienteNome: client.nome,
+    itens: [{ tipo: 'mao_obra', descricao: 'Revisão', quantidade: 1, valorUnitario: 90 }]
+  });
+  assert.equal(S.clientePhone(legacyOrder), '(27) 97777-3030');
 });
 
 test('store: aprovação e faturamento baixam estoque uma vez', () => {
@@ -609,7 +702,7 @@ test('store: falha de gravação desfaz alterações em memória e no estoque', 
   localStorage.setItem = () => { throw new Error('Quota excedida'); };
   console.error = () => {};
   try {
-    assert.throws(() => S.saveCliente({ nome: 'Cliente não salvo' }), /Não foi possível salvar/);
+    assert.throws(() => S.saveCliente({ nome: 'Cliente não salvo', telefone: '(27) 99999-1010' }), /Não foi possível salvar/);
     assert.deepEqual(S.store.data, before);
     assert.throws(() => S.adjustStock({ pecaId: part.id, tipo: 'Entrada', quantidade: 2 }), /Não foi possível salvar/);
     assert.deepEqual(S.store.data, before);
@@ -650,7 +743,7 @@ test('store: JSON corrompido é preservado e só pode ser substituído por recup
     localStorage.setItem(STORAGE_KEY, corrupted);
     const Corrupt = await import('../js/store.js?corrupt-storage-test');
     assert.match(Corrupt.storageWarning(), /corrompidos/);
-    assert.throws(() => Corrupt.saveCliente({ nome: 'Não deve substituir' }), /corrompidos/);
+    assert.throws(() => Corrupt.saveCliente({ nome: 'Não deve substituir', telefone: '(27) 99999-1010' }), /corrompidos/);
     assert.equal(localStorage.getItem(STORAGE_KEY), corrupted);
     assert.equal(Corrupt.store.data.clientes.length, 0);
     Corrupt.importPayload(backup);

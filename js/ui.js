@@ -79,9 +79,8 @@ export const NAV_GROUPS = [
   {
     label: 'Atendimento',
     items: [
-      { key: 'painel', label: 'Painel', href: '#/', icon: 'painel' },
       { key: 'ordens', label: 'Ordens de serviço', href: '#/ordens', icon: 'os', badge: 'openOrders' },
-      { key: 'clientes', label: 'Clientes', href: '#/clientes', icon: 'clientes' }
+      { key: 'painel', label: 'Painel', href: '#/', icon: 'painel' }
     ]
   },
   {
@@ -98,6 +97,12 @@ export const NAV_GROUPS = [
       { key: 'despesas', label: 'Despesas', href: '#/despesas', icon: 'despesas' },
       { key: 'financeiro', label: 'Contas e caixa', href: '#/financeiro', icon: 'caixa', badge: 'pendingBills' }
     ]
+  },
+  {
+    label: 'Cadastros auxiliares',
+    items: [
+      { key: 'clientes', label: 'Clientes e veículos', href: '#/clientes', icon: 'clientes' }
+    ]
   }
 ];
 
@@ -107,7 +112,28 @@ function navActive(path, href) {
   return path === route || path.startsWith(`${route}/`);
 }
 
-export function shell({ path, counts = {}, content, fontLabel = 'Normal' }) {
+function syncPresentation(sync) {
+  const status = sync?.status || 'offline';
+  const labels = {
+    synced: ['Sincronizado', 'Dados salvos na nuvem e neste dispositivo.'],
+    syncing: ['Sincronizando', 'Enviando ou recebendo alterações.'],
+    offline: ['Offline', 'Alterações ficam guardadas neste dispositivo.'],
+    error: ['Falha na sincronização', sync?.message || 'Tente novamente quando houver conexão.'],
+    auth: ['Sessão expirada', 'Entre novamente para continuar usando os dados da oficina.'],
+    conflict: ['Conflito de dados', 'Escolha qual versão deve ser mantida.'],
+    pending: ['Migração pendente', 'Escolha como importar os dados deste computador.'],
+    idle: ['Conectando', 'Verificando os dados da nuvem.']
+  };
+  const [label, text] = labels[status] || labels.idle;
+  return { label, text };
+}
+
+export function syncBadge(sync) {
+  const status = sync?.status || 'offline';
+  return `<span class="sync-badge sync-${escapeHtml(status)}" title="${escapeHtml(syncPresentation(sync).text)}"><span class="sync-dot" aria-hidden="true"></span>${escapeHtml(syncPresentation(sync).label)}${sync?.pending ? ' · pendente' : ''}</span>`;
+}
+
+export function shell({ path, counts = {}, content, fontLabel = 'Normal', sync = null }) {
   const nav = NAV_GROUPS.map((group) => `
     <div class="nav-group">
       <p class="nav-label">${escapeHtml(group.label)}</p>
@@ -129,21 +155,29 @@ export function shell({ path, counts = {}, content, fontLabel = 'Normal' }) {
       <div class="sidebar-scrim" data-action="closeMenu"></div>
       <aside class="sidebar" id="sidebar" aria-label="Menu principal">
         <div class="sidebar-top">
-          <a class="brand" href="#/" aria-label="Franlin Car Veículos — ir para o painel">${brandMark()}</a>
+          <a class="brand" href="#/ordens" aria-label="Franlin Car Veículos — ir para ordens de serviço">${brandMark()}</a>
           <button class="icon-button sidebar-close" data-action="closeMenu" aria-label="Fechar menu">${icon('x')}</button>
         </div>
         <a class="btn btn-primary btn-new-os" href="#/ordens/nova">${icon('plus')}<span>Nova O.S.</span></a>
         <nav class="nav">${nav}</nav>
         <div class="sidebar-foot">
           <a class="nav-link nav-help" href="#/ajuda">${icon('ajuda', 'nav-icon')}<span class="nav-text">Ajuda e manual</span></a>
-          <p class="sidebar-note">Dados salvos neste navegador.<br>Faça cópias de segurança.</p>
+          <div class="sidebar-cloud">
+            ${syncBadge(sync)}
+            <p>${escapeHtml(syncPresentation(sync).text)}</p>
+          </div>
         </div>
       </aside>
       <div class="app-main">
         <header class="topbar">
           <button class="icon-button menu-button" data-action="toggleMenu" aria-label="Abrir menu" aria-controls="sidebar" aria-expanded="false">${icon('menu')}</button>
-          <a class="topbar-brand" href="#/">${brandMark(true)}<span>Franlin Car Veículos</span></a>
+          <a class="topbar-brand" href="#/ordens">${brandMark(true)}<span>Franlin Car Veículos</span></a>
           <div class="topbar-actions">
+            ${sync ? `<div class="account-area">
+              ${syncBadge(sync)}
+              <div class="account-copy"><span>Conta conectada</span><strong title="${escapeHtml(sync.user?.email || '')}">${escapeHtml(sync.user?.email || '')}</strong></div>
+              <button type="button" class="btn btn-small btn-secondary" data-action="signOut">Sair</button>
+            </div>` : ''}
             <div class="font-control" role="group" aria-label="Tamanho da letra">
               <span class="font-label">Letra</span>
               <button type="button" class="font-btn" data-action="fontDown" aria-label="Diminuir letra">A−</button>
@@ -173,6 +207,81 @@ export function pageHead({ title, subtitle = '', help = '', actions = '' }) {
       </div>
       ${actions ? `<div class="page-head-actions">${actions}</div>` : ''}
     </header>
+  `;
+}
+
+export function authView({ mode = 'login', error = '', email = '', configured = true }) {
+  const titles = { login: 'Entrar na sua conta', signup: 'Criar sua conta', recover: 'Recuperar a senha' };
+  const subtitles = {
+    login: 'Use o mesmo e-mail e senha em qualquer computador para acessar os dados da oficina.',
+    signup: 'Crie uma conta para guardar os dados da oficina com segurança na nuvem.',
+    recover: 'Informe o e-mail da conta. Enviaremos um link para definir uma nova senha.'
+  };
+  return `
+    <main class="auth-page">
+      <section class="auth-card" aria-labelledby="auth-title">
+        <div class="auth-brand">${brandMark()}</div>
+        <span class="eyebrow">Franlin Car Veículos</span>
+        <h1 id="auth-title">${titles[mode]}</h1>
+        <p class="auth-subtitle">${subtitles[mode]}</p>
+        ${!configured ? '<div class="notice notice-warning">A conexão com a nuvem ainda não foi configurada pelo administrador do sistema.</div>' : ''}
+        ${error ? `<div class="notice notice-error" role="alert">${escapeHtml(error)}</div>` : ''}
+        <form class="form-grid auth-form" data-auth="${mode}">
+          ${field({ label: 'E-mail', name: 'email', value: email, type: 'email', required: true, span: 2, placeholder: 'voce@exemplo.com', attrs: 'autocomplete="email"' })}
+          ${mode !== 'recover' ? field({ label: 'Senha', name: 'password', type: 'password', required: true, span: 2, placeholder: 'Sua senha', attrs: `autocomplete="${mode === 'signup' ? 'new-password' : 'current-password'}" minlength="6"` }) : ''}
+          ${mode === 'signup' ? field({ label: 'Repita a senha', name: 'passwordConfirm', type: 'password', required: true, span: 2, placeholder: 'Repita a senha', attrs: 'autocomplete="new-password" minlength="6"' }) : ''}
+          ${mode === 'login' ? `<label class="check-field field-span2"><input type="checkbox" name="remember" value="1"> Manter conectado neste computador</label>` : ''}
+          <div class="form-actions field-span2">
+            <button class="btn btn-primary" type="submit">${mode === 'login' ? 'Entrar' : mode === 'signup' ? 'Criar conta' : 'Enviar link de recuperação'}</button>
+          </div>
+        </form>
+        <div class="auth-links">
+          ${mode === 'login' ? `<button type="button" class="link-button" data-action="authMode" data-mode="signup">Criar conta</button><button type="button" class="link-button" data-action="authMode" data-mode="recover">Esqueci minha senha</button>` : ''}
+          ${mode !== 'login' ? '<button type="button" class="link-button" data-action="authMode" data-mode="login">Voltar para entrar</button>' : ''}
+        </div>
+        <p class="auth-foot">Seus dados ficam associados somente a esta conta. Não compartilhe sua senha.</p>
+      </section>
+    </main>
+  `;
+}
+
+export function migrationView({ migration }) {
+  const local = migration?.local;
+  const remote = migration?.remote;
+  const count = (data) => ['ordens', 'clientes', 'veiculos'].reduce((total, key) => total + (data?.[key]?.length || 0), 0);
+  return `
+    <main class="gate-page">
+      <section class="gate-card">
+        <span class="gate-icon">${icon('banco')}</span>
+        <span class="eyebrow">Dados encontrados</span>
+        <h1>Escolha quais dados usar</h1>
+        <p>Este computador tem dados da versão anterior${remote ? ' e sua conta também tem dados na nuvem' : ''}. Para não apagar nada sem confirmação, escolha uma opção.</p>
+        <div class="gate-options">
+          <article><span class="eyebrow">Nuvem</span><h2>${remote ? `${count(remote.state)} registros` : 'Conta vazia'}</h2><p>${remote ? 'Manter somente os dados que já estão na nuvem.' : 'Começar uma conta vazia na nuvem.'}</p><button type="button" class="btn btn-primary" data-action="resolveCloud">Usar dados da nuvem</button></article>
+          <article><span class="eyebrow">Este computador</span><h2>${count(local)} registros</h2><p>Enviar os dados locais para a nuvem. A versão anterior da nuvem será arquivada no servidor.</p><button type="button" class="btn btn-primary" data-action="resolveDevice">Usar dados deste computador</button></article>
+        </div>
+        <p class="gate-note">Nenhuma opção será aplicada até você confirmar.</p>
+      </section>
+    </main>
+  `;
+}
+
+export function conflictView({ conflict }) {
+  const count = (data) => ['ordens', 'clientes', 'veiculos', 'movimentacoes'].reduce((total, key) => total + (data?.[key]?.length || 0), 0);
+  return `
+    <main class="gate-page">
+      <section class="gate-card">
+        <span class="gate-icon gate-warning">${icon('alerta')}</span>
+        <span class="eyebrow">Alterações ao mesmo tempo</span>
+        <h1>Resolva o conflito de dados</h1>
+        <p>Este dispositivo e a nuvem têm versões diferentes. As alterações estão bloqueadas para evitar perda de ordens, estoque ou pagamentos.</p>
+        <div class="gate-options">
+          <article><span class="eyebrow">Nuvem · revisão ${escapeHtml(conflict.remoteRevision)}</span><h2>${count(conflict.remote)} registros</h2><p>Descartar a versão pendente deste dispositivo e usar a versão mais recente da nuvem.</p><button type="button" class="btn btn-primary" data-action="resolveCloud">Usar dados da nuvem</button></article>
+          <article><span class="eyebrow">Este dispositivo · revisão ${escapeHtml(conflict.localRevision)}</span><h2>${count(conflict.local)} registros</h2><p>Enviar a versão deste dispositivo. A versão atual da nuvem será arquivada no servidor.</p><button type="button" class="btn btn-primary" data-action="resolveDevice">Usar dados deste computador</button></article>
+        </div>
+        <p class="gate-note">Não há escolha automática. Revise as cópias de segurança se precisar comparar os dados.</p>
+      </section>
+    </main>
   `;
 }
 
