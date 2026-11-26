@@ -61,11 +61,11 @@ export function brandMark(compact = false) {
   return `
     <span class="brand-symbol" aria-hidden="true">
       <svg viewBox="0 0 48 48" fill="none">
-        <rect width="48" height="48" rx="13" fill="#e11d2e"/>
+        <rect width="48" height="48" rx="13" fill="#145cc4"/>
         <path d="M10 29.5 12.4 23a4 4 0 0 1 3.7-2.6h15.8A4 4 0 0 1 35.6 23l2.4 6.5V35h-4.2a3.6 3.6 0 0 1-7.2 0H21.4a3.6 3.6 0 0 1-7.2 0H10v-5.5Z" fill="#fff"/>
-        <path d="M15.5 26.5h17M22 20.4h4" stroke="#e11d2e" stroke-width="1.8" stroke-linecap="round"/>
-        <circle cx="17.8" cy="32.4" r="1.5" fill="#e11d2e"/>
-        <circle cx="32.2" cy="32.4" r="1.5" fill="#e11d2e"/>
+        <path d="M15.5 26.5h17M22 20.4h4" stroke="#145cc4" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="17.8" cy="32.4" r="1.5" fill="#145cc4"/>
+        <circle cx="32.2" cy="32.4" r="1.5" fill="#145cc4"/>
       </svg>
     </span>
     ${compact ? '' : `<span class="brand-copy">

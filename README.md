@@ -1,6 +1,6 @@
 # Franlin Car Veículos
 
-Sistema simples de ordens de serviço para oficina, em português brasileiro, com área independente de estoque, frontend estático, conta por e-mail/senha e sincronização na nuvem. A versão atual é **1.3.0**.
+Sistema simples de ordens de serviço para oficina, em português brasileiro, com área independente de estoque, frontend estático, conta por e-mail/senha e sincronização na nuvem. A versão atual é **1.4.0**.
 
 ## Recursos
 
@@ -11,15 +11,21 @@ Sistema simples de ordens de serviço para oficina, em português brasileiro, co
 - Status Orçamento, Aprovada, Faturada e Cancelada, com baixa e estorno automático das peças usadas.
 - Mensagens preparadas para confirmação e envio manual no WhatsApp, usando o telefone informado na O.S. ou no cadastro.
 - Impressão da O.S. e salvamento em PDF pelo navegador.
-- Interface em tema claro, com controles grandes e três tamanhos de letra.
+- Interface profissional em azul e branco, com menu azul-marinho, tema claro, controles grandes e três tamanhos de letra.
 - Manual completo incorporado ao sistema, após as informações da conta.
 - Supabase Auth, isolamento por usuário, cache local, operação offline e sincronização automática.
 - Controle de concorrência por revisão, idempotência por mutation ID e resolução explícita de conflitos.
 - Endereços antigos de outras áreas são redirecionados para as ordens de serviço, sem apagar dados.
 
-## Endereço de publicação
+## Endereços de publicação
 
-GitHub Pages: https://sistemaamiapp-coder.github.io/franlincarveiculos/
+Endereço gratuito previsto: https://franlincarveiculos.vercel.app/
+
+Endereço atual no GitHub Pages: https://sistemaamiapp-coder.github.io/franlincarveiculos/
+
+A publicação no Vercel usa [`vercel.json`](vercel.json) e [`scripts/vercel-build.mjs`](scripts/vercel-build.mjs) para gerar um site estático sem dependências. O build copia somente o shell da aplicação e cria `config.json` a partir das variáveis `SUPABASE_URL` e `SUPABASE_ANON_KEY`; o arquivo local com essas configurações não é publicado.
+
+Para ativar o endereço gratuito, importe o repositório `sistemaamiapp-coder/franlincarveiculos` em [Vercel](https://vercel.com/new), autorize o acesso com a conta do GitHub e cadastre as duas variáveis do Supabase no projeto. O endereço do Vercel só estará disponível depois dessa importação e do primeiro deploy; o GitHub Pages continua funcionando como alternativa.
 
 O site é público, mas os dados só podem ser acessados por quem entra em uma conta. A mesma conta pode usar o sistema em vários dispositivos. Contas diferentes possuem espaços de dados separados.
 
@@ -49,7 +55,7 @@ Para usar login e nuvem na prévia, copie `config.example.json` para `config.jso
 
 1. Crie um projeto no Supabase e abra o **SQL Editor**.
 2. Execute o conteúdo de [`supabase/schema.sql`](supabase/schema.sql). Ele cria a tabela `fcv_workspaces`, as funções de commit e limpeza do arquivo de conflitos, e as políticas RLS.
-3. Em **Authentication > URL Configuration**, cadastre o endereço publicado como Site URL e inclua os endereços de redirecionamento usados para confirmação de e-mail e recuperação de senha. Para prévia local, inclua o endereço local correspondente.
+3. Em **Authentication > URL Configuration**, cadastre o endereço publicado como Site URL e inclua os endereços de redirecionamento usados para confirmação de e-mail e recuperação de senha. Ao ativar `franlincarveiculos.vercel.app`, inclua também o endereço gratuito e mantenha o endereço do GitHub Pages durante a transição. Para prévia local, inclua o endereço local correspondente.
 4. Copie a **Project URL** e a chave pública **anon** para `config.json` no ambiente local. Nunca use a chave `service_role` no navegador.
 5. No repositório GitHub, cadastre os secrets `SUPABASE_URL` e `SUPABASE_ANON_KEY`. O workflow gera `config.json` somente no artefato de publicação da branch `main`; os valores não são gravados no Git.
 6. Publique e valide criação e acesso à conta, recuperação de senha, isolamento entre contas e sincronização entre dois dispositivos.
@@ -79,6 +85,7 @@ O manual canônico está em [`MANUAL.md`](MANUAL.md) e é carregado dentro do si
 ├── README.md
 ├── agents.md
 ├── package.json
+├── vercel.json
 ├── config.example.json
 ├── .nojekyll
 ├── assets/
@@ -92,7 +99,8 @@ O manual canônico está em [`MANUAL.md`](MANUAL.md) e é carregado dentro do si
 ├── supabase/
 │   └── schema.sql
 ├── scripts/
-│   └── preview.ps1
+│   ├── preview.ps1
+│   └── vercel-build.mjs
 ├── tests/
 │   ├── smoke.mjs
 │   ├── auth.mjs

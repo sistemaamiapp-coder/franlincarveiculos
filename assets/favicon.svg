@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="favicon-title">
   <title id="favicon-title">Franlin Car Veículos</title>
   <defs>
-    <linearGradient id="vermelho-franlin" x1="8" y1="4" x2="58" y2="62" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ef3342"/>
-      <stop offset="1" stop-color="#a91421"/>
+    <linearGradient id="azul-franlin" x1="8" y1="4" x2="58" y2="62" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2d73c8"/>
+      <stop offset="1" stop-color="#0f49a3"/>
     </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="16" fill="url(#vermelho-franlin)"/>
+  <rect width="64" height="64" rx="16" fill="url(#azul-franlin)"/>
   <path d="M14 14h22v8H23v8h11v8H23v12h-9V14Z" fill="#fff"/>
   <path d="M50 25a14 14 0 1 0 0 14" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
   <path d="M14 52h36" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2" stroke-linecap="round"/>

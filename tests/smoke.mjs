@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 
 class MemoryStorage {
   #values = new Map();
@@ -255,20 +255,62 @@ test('ui: sistema expõe O.S. e estoque e mantém cliente e veículo opcionais',
   assert.match(uiSource, /dialog\.querySelector\('form\[data-form\]'\)\?\.addEventListener\('submit', \(event\) => event\.preventDefault\(\)\)/);
 });
 
-test('interface: tema claro e versões sincronizadas', () => {
+test('interface: tema claro azul e branco e versões sincronizadas', () => {
   const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  const ui = readFileSync(new URL('../js/ui.js', import.meta.url), 'utf8');
+  const favicon = readFileSync(new URL('../assets/favicon.svg', import.meta.url), 'utf8');
+  const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
   assert.match(css, /color-scheme:\s*light/);
   assert.doesNotMatch(css, /color-scheme:\s*dark|interface escura|--bg:\s*#0b0d11/);
   assert.match(css, /--text:\s*#17202a/);
+  assert.match(css, /--primary:\s*#145cc4/);
+  assert.match(css, /--sidebar-bg:\s*#0c2d4d/);
+  assert.doesNotMatch(css, /#b51624|#e11d2e|#a91421|#ef3342/);
+  assert.match(ui, /fill="#145cc4"/);
+  assert.match(favicon, /id="azul-franlin"/);
+  assert.match(index, /theme-color" content="#0c2d4d"/);
+  assert.doesNotMatch(index, /financeiro/);
 
   const app = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   const manual = readFileSync(new URL('../MANUAL.md', import.meta.url), 'utf8');
   const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
   assert.equal(app.match(/APP_VERSION = '([^']+)'/)[1], pkg.version);
+  assert.equal(sw.match(/CACHE_NAME = '([^']+)'/)[1], `fcv-shell-v${pkg.version}`);
   assert.ok(manual.includes(`versão **${pkg.version}**`));
   assert.ok(manual.includes(`Versão ${pkg.version}`));
   assert.ok(readme.includes(`versão atual é **${pkg.version}**`));
+});
+
+test('publicação: Vercel copia somente o shell e gera a configuração pública', async () => {
+  const output = new URL('../.vercel/output/static/', import.meta.url);
+  const previousUrl = process.env.SUPABASE_URL;
+  const previousKey = process.env.SUPABASE_ANON_KEY;
+  rmSync(output, { recursive: true, force: true });
+  process.env.SUPABASE_URL = 'https://exemplo.supabase.co';
+  process.env.SUPABASE_ANON_KEY = 'chave-publica-de-teste';
+
+  try {
+    await import('../scripts/vercel-build.mjs?smoke=1');
+    assert.equal(existsSync(new URL('index.html', output)), true);
+    assert.equal(existsSync(new URL('js/app.js', output)), true);
+    assert.equal(existsSync(new URL('assets/favicon.svg', output)), true);
+    assert.equal(existsSync(new URL('MANUAL.md', output)), true);
+    assert.equal(existsSync(new URL('config.example.json', output)), false);
+    assert.equal(existsSync(new URL('README.md', output)), false);
+    assert.equal(existsSync(new URL('CNAME', output)), false);
+    assert.deepEqual(JSON.parse(readFileSync(new URL('config.json', output), 'utf8')), {
+      supabaseUrl: 'https://exemplo.supabase.co',
+      supabaseAnonKey: 'chave-publica-de-teste'
+    });
+  } finally {
+    if (previousUrl === undefined) delete process.env.SUPABASE_URL;
+    else process.env.SUPABASE_URL = previousUrl;
+    if (previousKey === undefined) delete process.env.SUPABASE_ANON_KEY;
+    else process.env.SUPABASE_ANON_KEY = previousKey;
+    rmSync(new URL('../.vercel/output/', import.meta.url), { recursive: true, force: true });
+  }
 });
 
 test('util: normalização e validação de WhatsApp', () => {

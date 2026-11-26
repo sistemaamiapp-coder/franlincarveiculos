@@ -1,6 +1,6 @@
 # Manual do Franlin Car Veículos
 
-Bem-vindo ao manual do **Franlin Car Veículos**, versão **1.3.0**. O sistema organiza as **ordens de serviço**, chamadas de **O.S.**, e o **estoque da loja** de forma simples e direta.
+Bem-vindo ao manual do **Franlin Car Veículos**, versão **1.4.0**. O sistema organiza as **ordens de serviço**, chamadas de **O.S.**, e o **estoque da loja** de forma simples e direta.
 
 Os dados da conta ficam salvos na nuvem e também em cache no dispositivo. Com internet, as alterações aparecem nos outros computadores que usam a mesma conta. Contas diferentes têm dados separados.
 
@@ -54,7 +54,7 @@ O menu oferece:
 - **Estoque:** cadastra peças, registra entradas e saídas e consulta o histórico.
 - **Ajuda e manual:** mostra a situação da conta e, no final da página, o manual completo.
 
-No computador, o menu fica à esquerda. Em tela pequena, toque no botão de menu no topo. Os endereços usam `#`, por exemplo, `#/ordens`; isso é normal e não compartilha dados sem login.
+No computador, o menu fica à esquerda. Em tela pequena, toque no botão de menu no topo. A interface usa azul e branco, com menu azul-marinho e área de trabalho clara. Cores de alerta continuam identificando erros, cancelamentos e ações de exclusão. Os endereços usam `#`, por exemplo, `#/ordens`; isso é normal e não compartilha dados sem login.
 
 A página volta ao início somente ao trocar de tela ou de passo do assistente. Atualizações automáticas de sincronização não alteram a posição de leitura.
 
@@ -62,7 +62,7 @@ Se você abrir um endereço antigo de outra área, o sistema volta automaticamen
 
 ### Como aumentar ou diminuir a letra
 
-No topo, use **A+** para aumentar e **A−** para diminuir. As opções são **Normal**, **Grande** e **Maior**. O sistema usa tema claro e o navegador também pode ampliar a página.
+No topo, use **A+** para aumentar e **A−** para diminuir. As opções são **Normal**, **Grande** e **Maior**. O sistema usa tema claro, com contraste reforçado e controles grandes, e o navegador também pode ampliar a página.
 
 ### Como acompanhar a sincronização
 
@@ -386,4 +386,4 @@ O manual deve acompanhar o aplicativo. Toda mudança funcional, de interface ou 
 
 ---
 
-Franlin Car Veículos · Manual do usuário · Versão 1.3.0
+Franlin Car Veículos · Manual do usuário · Versão 1.4.0
