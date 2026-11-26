@@ -8,7 +8,7 @@ import {
   vehicleTitle, fileStamp, nowISO, round2, isInMonth
 } from './util.js';
 
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const root = document.getElementById('app');
 
 const viewState = {
@@ -47,6 +47,7 @@ function parseRoute() {
   const [pathPart, queryPart = ''] = raw.split('?');
   let path = pathPart.startsWith('/') ? pathPart : `/${pathPart}`;
   const supported = path === '/ordens' || path.startsWith('/ordens/')
+    || path === '/estoque' || path.startsWith('/estoque/')
     || path === '/ajuda' || path.startsWith('/ajuda/');
   if (!supported) {
     path = '/ordens';
@@ -63,8 +64,8 @@ function currentRoute() {
   return parseRoute().path;
 }
 
-function refresh() {
-  render();
+function refresh({ scrollToTop = false } = {}) {
+  render({ scrollToTop });
 }
 
 function navigate(path) {
@@ -80,6 +81,7 @@ function titleForPath(path) {
     const order = parts[1] ? S.ordemById(parts[1]) : null;
     return order ? `O.S. ${order.numero}` : 'Ordens de serviço';
   }
+  if (parts[0] === 'estoque') return parts[1] === 'movimentacoes' ? 'Movimentações de estoque' : 'Estoque';
   if (parts[0] === 'ajuda') return 'Ajuda e manual';
   return 'Ordens de serviço';
 }
@@ -91,6 +93,10 @@ function contentForPath(path) {
     if (parts[1] && parts[2] === 'editar') return orderFormView(parts[1]);
     if (parts[1]) return orderDetailView(parts[1]);
     return ordersView();
+  }
+  if (parts[0] === 'estoque') {
+    if (parts[1] === 'movimentacoes') return movementsView();
+    return stockView();
   }
   if (parts[0] === 'ajuda') return helpView(path);
   return ordersView();
@@ -122,7 +128,7 @@ function applyFontScale() {
   if (up) up.disabled = fontScale >= 3;
 }
 
-function render() {
+function render({ scrollToTop = false } = {}) {
   if (booting) {
     root.innerHTML = '<main class="auth-page"><section class="auth-card"><span class="gate-icon"><span class="loading-dot" aria-hidden="true"></span></span><h1>Conectando…</h1><p class="auth-subtitle">Verificando sua conta e os dados da oficina.</p></section></main>';
     return;
@@ -145,6 +151,8 @@ function render() {
 
   const route = parseRoute();
   const routeKey = `${route.path}${route.query.toString() ? `?${route.query.toString()}` : ''}`;
+  const routeChanged = lastRouteKey !== routeKey;
+  const previousScrollY = window.scrollY;
   const content = contentForPath(route.path, route.query);
   const storageWarning = S.storageWarning();
   const syncWarning = syncSnapshot?.status === 'error' ? `
@@ -171,9 +179,15 @@ function render() {
   menuButton?.setAttribute('aria-expanded', 'false');
   applyFontScale();
   lastRouteKey = routeKey;
-  requestAnimationFrame(() => {
-    window.scrollTo({ top: 0, behavior: 'auto' });
-  });
+  if (routeChanged || scrollToTop) {
+    const scrollToStart = () => window.scrollTo({ top: 0, behavior: 'auto' });
+    scrollToStart();
+    setTimeout(scrollToStart, 0);
+  } else if (Math.abs(window.scrollY - previousScrollY) > 1) {
+    const restoreScroll = () => window.scrollTo({ top: previousScrollY, behavior: 'auto' });
+    restoreScroll();
+    setTimeout(restoreScroll, 0);
+  }
   if (route.path.startsWith('/ajuda')) loadManualIntoPage();
 }
 
@@ -445,7 +459,6 @@ function orderDetailView(id) {
             <div class="card-head"><div><h2>${icon('calendario')}Datas e veículo</h2></div></div>
             <dl class="data-grid">
               <div><dt>Abertura</dt><dd>${esc(fmtDate(order.dataAbertura))}</dd></div>
-              <div><dt>Previsão de entrega</dt><dd>${esc(fmtDate(order.dataPrevisao))}</dd></div>
               <div><dt>Faturamento</dt><dd>${esc(fmtDate(order.dataFaturamento))}</dd></div>
               <div><dt>KM informado</dt><dd>${order.km ? `${esc(qty(order.km))} km` : '—'}</dd></div>
             </dl>
@@ -560,7 +573,7 @@ function blankOsDraft() {
     id: '', numero: S.peekNextOrderNumber(),
     clienteId: '', clienteNome: '', clienteTelefone: '',
     veiculoId: '', veiculoPlaca: '', veiculoDescricao: '', km: '',
-    dataAbertura: todayISO(), dataPrevisao: '', problemaRelatado: '', itens: [],
+    dataAbertura: todayISO(), problemaRelatado: '', itens: [],
     desconto: 0, status: 'Orçamento', formaPagamento: '', pago: false, observacoes: '', step: 1
   };
 }
@@ -602,28 +615,22 @@ function osStepper(step) {
 }
 
 function osStepOne(draft) {
-  const clients = sortBy(S.store.data.clientes, (client) => client.nome);
-  const vehicles = S.veiculosDoCliente(draft.clienteId);
-  const client = S.clienteById(draft.clienteId);
   return `
     <header class="form-page-head">
       <div><span class="eyebrow">Passo 1 de 3</span><h1>${draft.id ? 'Editar dados do atendimento' : 'Dados do atendimento'}</h1><p>Cliente e veículo são opcionais. Registre a O.S. agora e cadastre depois, somente se quiser.</p></div>
     </header>
     <form class="form-card" data-form="osStep1">
       <div class="form-section">
-        <div class="form-section-head"><span>1</span><div><h2>Cliente (opcional)</h2><p>Use um cadastro pronto, informe os dados abaixo ou cadastre aqui somente se quiser.</p></div><button type="button" class="btn btn-small btn-secondary" data-action="newClient">${icon('plus')}Cadastrar cliente</button></div>
+        <div class="form-section-head"><span>1</span><div><h2>Cliente (opcional)</h2><p>Informe os dados abaixo ou cadastre aqui somente se quiser.</p></div><button type="button" class="btn btn-small btn-secondary" data-action="newClient">${icon('plus')}Cadastrar cliente</button></div>
         <div class="form-grid">
-          ${U.selectField({ label: 'Cliente cadastrado', name: 'clienteId', value: draft.clienteId, options: clients.map((item) => ({ value: item.id, label: `${item.nome}${item.telefone ? ` · ${item.telefone}` : ''}` })), placeholder: 'Não cadastrar cliente', span: 2, attrs: 'data-os-client', help: 'O cadastro é opcional e serve para reutilizar os dados.' })}
           ${U.field({ label: 'Nome do cliente', name: 'clienteNome', value: draft.clienteNome, placeholder: 'Ex.: Maria' })}
           ${U.field({ label: 'Telefone / WhatsApp', name: 'clienteTelefone', value: draft.clienteTelefone, placeholder: 'Ex.: (27) 99999-1010', attrs: 'inputmode="tel" maxlength="20"', help: 'Opcional. É necessário somente para enviar mensagens.' })}
-          ${client ? `<div class="inline-note field-span2">${icon('telefone')}<span>Cadastro selecionado: ${esc(client.nome)} · ${esc(client.telefone || 'sem telefone')}</span></div>` : ''}
         </div>
       </div>
 
       <div class="form-section">
-        <div class="form-section-head"><span>2</span><div><h2>Veículo (opcional)</h2><p>Escolha um cadastro, digite a placa e o veículo ou cadastre aqui somente se quiser.</p></div>${client ? `<button type="button" class="btn btn-small btn-secondary" data-action="osNewVehicle" data-id="${esc(client.id)}">${icon('plus')}Cadastrar veículo</button>` : ''}</div>
+        <div class="form-section-head"><span>2</span><div><h2>Veículo (opcional)</h2><p>Informe a placa e o veículo abaixo ou cadastre aqui somente se quiser.</p></div><button type="button" class="btn btn-small btn-secondary" data-action="osNewVehicle">${icon('plus')}Cadastrar veículo</button></div>
         <div class="form-grid">
-          ${U.selectField({ label: 'Veículo cadastrado', name: 'veiculoId', value: draft.veiculoId, options: vehicles.map((vehicle) => ({ value: vehicle.id, label: `${vehicle.placa} · ${vehicleTitle(vehicle) || 'Veículo'}${vehicle.cor ? ` · ${vehicle.cor}` : ''}` })), placeholder: client ? 'Não cadastrar veículo' : 'Selecione um cliente para listar', span: 2, attrs: `data-os-vehicle${client ? '' : ' disabled'}`, help: 'Você pode deixar todos os campos do veículo em branco.' })}
           ${U.field({ label: 'Placa', name: 'veiculoPlaca', value: draft.veiculoPlaca, placeholder: 'Ex.: ABC1D23', attrs: 'maxlength="8" autocapitalize="characters"' })}
           ${U.field({ label: 'Veículo / modelo', name: 'veiculoDescricao', value: draft.veiculoDescricao, placeholder: 'Ex.: Volkswagen Gol' })}
           ${U.field({ label: 'KM atual', name: 'km', value: draft.km, placeholder: 'Ex.: 128400', help: 'Quilometragem informada na entrada.', attrs: 'inputmode="numeric" maxlength="10"' })}
@@ -634,7 +641,6 @@ function osStepOne(draft) {
         <div class="form-section-head"><span>3</span><div><h2>Atendimento</h2><p>Descreva o problema com as palavras do cliente.</p></div></div>
         <div class="form-grid">
           ${U.field({ label: 'Data de abertura', name: 'dataAbertura', type: 'date', value: draft.dataAbertura })}
-          ${U.field({ label: 'Previsão de entrega', name: 'dataPrevisao', type: 'date', value: draft.dataPrevisao, help: 'Pode ser preenchida depois.' })}
           ${U.textareaField({ label: 'Problema relatado / serviço solicitado', name: 'problemaRelatado', value: draft.problemaRelatado, rows: 4, placeholder: 'Ex.: barulho no freio ao parar; cliente pediu revisão completa.' })}
         </div>
       </div>
@@ -653,7 +659,7 @@ function osStepTwo(draft) {
   const vehicleLabel = [draft.veiculoDescricao, draft.veiculoPlaca].filter(Boolean).join(' · ') || 'Veículo não informado';
   return `
     <header class="form-page-head">
-      <div><span class="eyebrow">Passo 2 de 3</span><h1>Quais peças e serviços?</h1><p>Adicione cada item. O sistema calcula o total automaticamente.</p></div>
+      <div><span class="eyebrow">Passo 2 de 3</span><h1>Quais peças e serviços?</h1><p>Adicione cada item. Ao aprovar a O.S., as peças selecionadas são baixadas do estoque automaticamente.</p></div>
       <div class="selected-entity">${U.avatar(clientName)}<div><small>Cliente e veículo</small><strong>${esc(clientName)}</strong><span>${esc(vehicleLabel)}</span></div><button type="button" class="btn btn-small btn-secondary" data-action="osBack">${icon('editar')}Alterar</button></div>
     </header>
     <div class="os-items-layout">
@@ -707,7 +713,7 @@ function osStepThree(draft) {
   const vehicleLabel = [draft.veiculoDescricao, draft.veiculoPlaca].filter(Boolean).join(' · ') || 'Veículo não informado';
   return `
     <header class="form-page-head">
-      <div><span class="eyebrow">Passo 3 de 3</span><h1>Revise e salve a O.S.</h1><p>Confira os dados, escolha o status e salve. Depois você poderá enviar o orçamento pelo WhatsApp.</p></div>
+      <div><span class="eyebrow">Passo 3 de 3</span><h1>Revise e salve a O.S.</h1><p>Confira os dados e salve. A O.S. nova começa em Orçamento; depois você poderá enviar o orçamento pelo WhatsApp.</p></div>
     </header>
     <form class="form-card" data-form="osSave">
       <section class="review-summary">
@@ -718,14 +724,12 @@ function osStepThree(draft) {
       </section>
 
       <div class="form-section">
-        <div class="form-section-head"><span>1</span><div><h2>Status e pagamento</h2><p>Deixe em Orçamento para enviar ao cliente antes de aprovar.</p></div></div>
+        <div class="form-section-head"><span>1</span><div><h2>Orçamento e pagamento</h2><p>Depois de salva, use os botões nos detalhes da O.S. para aprovar, faturar ou registrar o recebimento.</p></div></div>
         <div class="form-grid">
           ${U.field({ label: 'Número da O.S.', name: 'numero', value: draft.numero, required: true, attrs: 'maxlength="24"' })}
-          ${U.selectField({ label: 'Status', name: 'status', value: draft.status, required: true, options: S.OS_STATUSES, attrs: 'data-os-status', help: 'Ao aprovar ou faturar, as peças são baixadas do estoque automaticamente.' })}
           ${U.field({ label: 'Desconto (R$)', name: 'desconto', type: 'number', min: '0', step: '0.01', value: draft.desconto || 0 })}
           ${U.selectField({ label: 'Forma de pagamento', name: 'formaPagamento', value: draft.formaPagamento, options: S.PAYMENT_METHODS, placeholder: 'Escolha depois' })}
-          <label class="check-card field-span2"><input type="checkbox" name="pago" ${draft.pago ? 'checked' : ''} ${draft.status === 'Faturada' ? '' : 'disabled'}><span><strong>Pagamento já recebido</strong><small>Disponível quando a O.S. estiver faturada.</small></span></label>
-          <div class="inline-note field-span2 status-stock-note" id="os-stock-note">${icon('info')}<span>${draft.status === 'Orçamento' ? 'Em orçamento: nenhuma peça sai do estoque.' : draft.status === 'Aprovada' || draft.status === 'Faturada' ? 'Ao salvar, as peças desta O.S. serão baixadas do estoque.' : 'O.S. cancelada: nenhuma peça será baixada.'}</span></div>
+          <div class="inline-note field-span2 status-stock-note" id="os-stock-note">${icon('info')}<span>${draft.id ? `Status atual: <strong>${esc(draft.status)}</strong>. O status e o recebimento são alterados nos detalhes da O.S.` : 'Status: <strong>Orçamento</strong>. Nenhuma peça sai do estoque.'}</span></div>
         </div>
       </div>
 
@@ -762,7 +766,7 @@ function stockView() {
     <div class="page-wrap">
       ${U.pageHead({
         title: 'Peças em estoque',
-        subtitle: 'Controle o disponível, o estoque mínimo e todo o histórico de entradas e saídas.',
+        subtitle: 'Controle entradas e saídas manuais. Peças de O.S. aprovadas são baixadas automaticamente.',
         help: 'estoque',
         actions: `<a class="btn btn-secondary" href="#/estoque/movimentacoes">${icon('relogio')}Movimentações</a><button type="button" class="btn btn-primary" data-action="newPart">${icon('plus')}Nova peça</button>`
       })}
@@ -1514,7 +1518,7 @@ async function openMovementModal(partId = '') {
   const formId = 'form-movimentacao';
   U.openModal({
     title: 'Entrada ou saída de estoque',
-    subtitle: 'Toda alteração fica registrada no histórico com data, motivo e saldo.',
+    subtitle: 'Use para entradas e saídas manuais. Peças usadas em O.S. são baixadas ao aprovar a ordem.',
     body: `<form id="${formId}" data-form="movimentacao">
       <div class="modal-form-grid">
         ${U.selectField({ label: 'Peça', name: 'pecaId', value: selected, required: true, options: parts.map((part) => ({ value: part.id, label: `${part.nome} · ${qty(part.quantidadeEstoque)} ${part.unidade}` })), span: 2, attrs: 'data-movement-part' })}
@@ -1799,9 +1803,9 @@ function orderWhatsAppMessage(order, template) {
   const total = `Total: ${money(order.total)}${Number(order.desconto) > 0 ? ` (desconto de ${money(order.desconto)})` : ''}`;
   let text = '';
   if (template === 'orcamento') {
-    text = `Olá, ${firstName}! Aqui é a Franlin Car Veículos.\n\nSegue o orçamento da O.S. ${order.numero}${vehicle ? ` para ${vehicle}` : ''}:\n\n${items || 'Serviço a combinar.'}\n\n${total}${order.dataPrevisao ? `\nPrevisão de entrega: ${fmtDate(order.dataPrevisao)}` : ''}\n\nPor favor, confirme se o orçamento está aprovado. Obrigado!`;
+    text = `Olá, ${firstName}! Aqui é a Franlin Car Veículos.\n\nSegue o orçamento da O.S. ${order.numero}${vehicle ? ` para ${vehicle}` : ''}:\n\n${items || 'Serviço a combinar.'}\n\n${total}\n\nPor favor, confirme se o orçamento está aprovado. Obrigado!`;
   } else if (template === 'andamento') {
-    text = `Olá, ${firstName}! Aqui é a Franlin Car Veículos.\n\nA O.S. ${order.numero}${vehicle ? ` do veículo ${vehicle}` : ''} foi aprovada e o serviço está em andamento.${order.dataPrevisao ? `\nPrevisão de entrega: ${fmtDate(order.dataPrevisao)}.` : ''}\n\nAvisaremos assim que estiver pronta. Obrigado!`;
+    text = `Olá, ${firstName}! Aqui é a Franlin Car Veículos.\n\nA O.S. ${order.numero}${vehicle ? ` do veículo ${vehicle}` : ''} foi aprovada e o serviço está em andamento.\n\nAvisaremos assim que estiver pronta. Obrigado!`;
   } else if (template === 'cobranca') {
     text = `Olá, ${firstName}! Aqui é a Franlin Car Veículos.\n\nEstamos entrando em contato sobre a O.S. ${order.numero}, faturada em ${fmtDate(order.dataFaturamento)}.\n\nValor em aberto: ${money(order.total)}${order.formaPagamento ? `\nForma combinada: ${order.formaPagamento}` : ''}\n\nEntre em contato conosco para confirmar o pagamento. Obrigado!`;
   } else if (template === 'pronta') {
@@ -1868,7 +1872,6 @@ function printableOrder(order) {
       <div><span>Placa</span><strong>${esc(order.veiculoPlaca || '—')}</strong></div>
       <div><span>KM</span><strong>${order.km ? `${esc(qty(order.km))} km` : '—'}</strong></div>
       <div><span>Abertura</span><strong>${esc(fmtDate(order.dataAbertura))}</strong></div>
-      <div><span>Previsão</span><strong>${esc(fmtDate(order.dataPrevisao))}</strong></div>
     </div></section>
     <section class="print-section"><h2>Problema relatado / serviço solicitado</h2><p>${esc(order.problemaRelatado || 'Não informado').replace(/\n/g, '<br>')}</p></section>
     <section class="print-section"><h2>Peças e serviços</h2><table class="print-table"><thead><tr><th>Descrição</th><th>Qtd.</th><th>Unitário</th><th>Total</th></tr></thead><tbody>
@@ -2235,10 +2238,10 @@ async function submitForm(form, submitter = null) {
       refresh();
       U.toast('Serviço atualizado na O.S.');
     } else if (kind === 'osStep1') {
-      const client = values.clienteId ? S.clienteById(values.clienteId) : null;
-      if (values.clienteId && !client) throw new Error('O cliente selecionado não foi encontrado.');
-      const vehicle = values.veiculoId ? S.veiculoById(values.veiculoId) : null;
-      if (values.veiculoId && (!vehicle || (client && vehicle.clienteId !== client.id))) throw new Error('Confira o veículo selecionado.');
+      const client = osDraft.clienteId ? S.clienteById(osDraft.clienteId) : null;
+      if (osDraft.clienteId && !client) throw new Error('O cliente selecionado não foi encontrado.');
+      const vehicle = osDraft.veiculoId ? S.veiculoById(osDraft.veiculoId) : null;
+      if (osDraft.veiculoId && (!vehicle || (client && vehicle.clienteId !== client.id))) throw new Error('Confira o veículo selecionado.');
       Object.assign(osDraft, values, {
         step: 2,
         clienteNome: values.clienteNome || client?.nome || '',
@@ -2246,7 +2249,7 @@ async function submitForm(form, submitter = null) {
         veiculoPlaca: values.veiculoPlaca || vehicle?.placa || '',
         veiculoDescricao: values.veiculoDescricao || (vehicle ? vehicleTitle(vehicle) : '')
       });
-      refresh();
+      refresh({ scrollToTop: true });
     } else if (kind === 'osSave') {
       const client = S.clienteById(osDraft.clienteId);
       const vehicle = S.veiculoById(osDraft.veiculoId);
@@ -2254,10 +2257,12 @@ async function submitForm(form, submitter = null) {
       if (osDraft.veiculoId && (!vehicle || (client && vehicle.clienteId !== client.id))) throw new Error('Confira o veículo selecionado.');
       if (!osDraft.itens.length) throw new Error('Adicione pelo menos uma peça ou um serviço antes de salvar.');
       if (Number(values.desconto) > S.computeOrderTotals(osDraft.itens).total) throw new Error('O desconto não pode ser maior que o total dos itens.');
-      const pago = values.status === 'Faturada' && values.pago === 'on';
+      const status = osDraft.id ? osDraft.status : 'Orçamento';
+      const pago = status === 'Faturada' && Boolean(osDraft.pago);
       const order = S.saveOrder({
         ...osDraft,
         ...values,
+        status,
         pago,
         clienteNome: osDraft.clienteNome || client?.nome || '',
         clienteTelefone: osDraft.clienteTelefone || client?.telefone || '',
@@ -2317,7 +2322,7 @@ async function changeOrderStatus(id, status) {
   }
   const messages = {
     Aprovada: 'Ao aprovar, as peças desta O.S. serão baixadas do estoque automaticamente.',
-    Faturada: 'A O.S. será faturada e entrará em Contas a receber se ainda não estiver paga.',
+    Faturada: 'A O.S. será faturada. Se ainda não estiver paga, marque o recebimento nos detalhes da ordem.',
     Cancelada: order.estoqueBaixado ? 'Ao cancelar, as peças baixadas voltarão ao estoque.' : 'A O.S. será marcada como cancelada.',
     Orçamento: order.estoqueBaixado ? 'Ao reabrir como orçamento, as peças voltarão ao estoque.' : 'A O.S. voltará para Orçamento.'
   };
@@ -2629,11 +2634,11 @@ document.addEventListener('click', async (event) => {
         break;
       case 'osBack':
         osDraft.step = 1;
-        refresh();
+        refresh({ scrollToTop: true });
         break;
       case 'osBackTwo':
         osDraft.step = 2;
-        refresh();
+        refresh({ scrollToTop: true });
         break;
       case 'osNextReview':
         if (!osDraft.itens.length) {
@@ -2641,7 +2646,7 @@ document.addEventListener('click', async (event) => {
           break;
         }
         osDraft.step = 3;
-        refresh();
+        refresh({ scrollToTop: true });
         break;
       case 'osCancel': {
         const confirmed = await U.confirmDialog({
@@ -2733,35 +2738,6 @@ document.addEventListener('change', (event) => {
     viewState.movements.tipo = target.value;
     const list = document.querySelector('[data-list="movements"]');
     if (list) list.innerHTML = renderMovementsList();
-    return;
-  }
-  if (target.matches('[data-os-client]')) {
-    const values = formValues(target.form);
-    const client = S.clienteById(values.clienteId);
-    Object.assign(osDraft, values, {
-      clienteNome: client?.nome || values.clienteNome || '',
-      clienteTelefone: client ? client.telefone : values.clienteTelefone || '',
-      veiculoId: '',
-      veiculoPlaca: '',
-      veiculoDescricao: ''
-    });
-    refresh();
-    return;
-  }
-  if (target.matches('[data-os-vehicle]')) {
-    const values = formValues(target.form);
-    const vehicle = S.veiculoById(values.veiculoId);
-    Object.assign(osDraft, values, {
-      veiculoPlaca: vehicle?.placa || values.veiculoPlaca || '',
-      veiculoDescricao: vehicle ? vehicleTitle(vehicle) : values.veiculoDescricao || ''
-    });
-    refresh();
-    return;
-  }
-  if (target.matches('[data-os-status]')) {
-    Object.assign(osDraft, formValues(target.form), { pago: target.form.querySelector('[name="pago"]')?.checked || false });
-    if (osDraft.status !== 'Faturada') osDraft.pago = false;
-    refresh();
     return;
   }
   if (target.matches('[data-purchase-status]') && target.form.dataset.form === 'purchase') {

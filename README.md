@@ -1,10 +1,11 @@
 # Franlin Car Veículos
 
-Sistema simples de ordens de serviço para oficina, em português brasileiro, com frontend estático, conta por e-mail/senha e sincronização na nuvem. A versão atual é **1.2.0**.
+Sistema simples de ordens de serviço para oficina, em português brasileiro, com área independente de estoque, frontend estático, conta por e-mail/senha e sincronização na nuvem. A versão atual é **1.3.0**.
 
 ## Recursos
 
-- Ordens de serviço como única área de trabalho, com assistente de três passos, peças, mão de obra, desconto e pagamento.
+- Ordens de serviço com assistente de três passos, peças, mão de obra, desconto e pagamento.
+- Área independente de estoque com cadastro de peças, entradas, saídas, estoque mínimo e histórico de movimentações.
 - Abertura de O.S. sem cliente ou veículo, ou com nome, telefone, placa e descrição informados diretamente na O.S.
 - Cadastros opcionais de clientes e veículos dentro da própria O.S.; o cadastro de cliente exige nome e telefone, mas não e-mail.
 - Status Orçamento, Aprovada, Faturada e Cancelada, com baixa e estorno automático das peças usadas.
@@ -61,7 +62,7 @@ Cada conta possui um workspace JSONB com o estado completo da aplicação. O cli
 
 As alterações são guardadas primeiro no dispositivo e enviadas depois. Cada envio usa uma revisão de base e um `mutation_id`; respostas perdidas podem ser repetidas sem duplicar a revisão. Se a nuvem estiver em uma revisão diferente, o aplicativo bloqueia alterações e mostra as duas opções de resolução. A versão anterior da nuvem é arquivada no servidor antes de uma substituição escolhida pela pessoa usuária.
 
-O aplicativo não possui telas separadas de clientes, veículos, estoque, compras ou financeiro. Cliente e veículo são identificados diretamente na O.S. ou reutilizados por meio dos cadastros opcionais abertos dentro dela. As peças continuam sendo controladas internamente para preservar a baixa e o estorno corretos, mas não há uma tela separada de estoque. Use **Ajuda e manual > Sincronizar agora** para conferir a conexão com a nuvem.
+O menu principal oferece **Ordens de serviço** e **Estoque**. Cliente e veículo são identificados diretamente na O.S. ou reutilizados por meio dos cadastros opcionais abertos dentro dela. No estoque, entradas e saídas manuais ficam registradas no histórico; ao aprovar uma O.S., as peças usadas são baixadas automaticamente uma única vez. Cancelamento, reabertura, exclusão ou alteração dos itens fazem os estornos e ajustes necessários. Use **Ajuda e manual > Sincronizar agora** para conferir a conexão com a nuvem.
 
 ## Manual
 

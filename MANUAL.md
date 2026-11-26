@@ -1,6 +1,6 @@
 # Manual do Franlin Car Veículos
 
-Bem-vindo ao manual do **Franlin Car Veículos**, versão **1.2.0**. O sistema é simples e direto: a única área de trabalho é a **ordem de serviço**, chamada de **O.S.**
+Bem-vindo ao manual do **Franlin Car Veículos**, versão **1.3.0**. O sistema organiza as **ordens de serviço**, chamadas de **O.S.**, e o **estoque da loja** de forma simples e direta.
 
 Os dados da conta ficam salvos na nuvem e também em cache no dispositivo. Com internet, as alterações aparecem nos outros computadores que usam a mesma conta. Contas diferentes têm dados separados.
 
@@ -12,12 +12,13 @@ Os dados da conta ficam salvos na nuvem e também em cache no dispositivo. Com i
 - Permite identificar cliente e veículo diretamente na O.S., sem cadastro obrigatório.
 - Oferece cadastros opcionais de cliente e veículo dentro da própria O.S. para reutilizar dados.
 - Acompanha os status **Orçamento**, **Aprovada**, **Faturada** e **Cancelada**.
-- Controla internamente a baixa e o estorno das peças usadas na O.S.
+- Oferece uma área independente de estoque com peças, entradas, saídas, estoque mínimo e histórico.
+- Baixa automaticamente as peças usadas ao aprovar uma O.S. e faz os estornos necessários.
 - Prepara mensagens para envio manual pelo WhatsApp.
 - Imprime a O.S. ou permite salvá-la em PDF pelo navegador.
 - Sincroniza os dados entre dispositivos e mantém alterações offline até a conexão voltar.
 
-Não há telas separadas de painel, clientes, veículos, estoque, compras, fornecedores, despesas ou caixa. Os cadastros e o controle de peças continuam existindo apenas como apoio ao fluxo da O.S.
+Além das O.S., o sistema possui a tela **Estoque**. Cliente e veículo continuam opcionais e são identificados diretamente na ordem ou por cadastros abertos dentro dela. Não há telas de painel, compras, fornecedores, despesas ou caixa.
 
 ### Sequência para começar
 
@@ -26,7 +27,7 @@ Não há telas separadas de painel, clientes, veículos, estoque, compras, forne
 3. No passo 1, informe cliente e veículo se quiser. Os dois são opcionais.
 4. Descreva o problema e clique em **Continuar para peças e serviços**.
 5. Adicione pelo menos uma peça ou um serviço de mão de obra.
-6. Confira a revisão, escolha status e pagamento e salve a O.S.
+6. Confira a revisão e salve a O.S. como Orçamento.
 7. Se houver telefone válido com DDD, envie a mensagem preparada pelo WhatsApp.
 8. Na O.S. salva, acompanhe aprovação, faturamento, recebimento ou cancelamento.
 
@@ -46,13 +47,16 @@ Use **Sair** no topo quando terminar, principalmente em computador compartilhado
 
 ### Como navegar
 
-O menu tem somente duas opções:
+O menu oferece:
 
 - **Nova O.S.:** inicia um novo atendimento.
 - **Ordens de serviço:** lista, busca e filtra as ordens.
+- **Estoque:** cadastra peças, registra entradas e saídas e consulta o histórico.
 - **Ajuda e manual:** mostra a situação da conta e, no final da página, o manual completo.
 
 No computador, o menu fica à esquerda. Em tela pequena, toque no botão de menu no topo. Os endereços usam `#`, por exemplo, `#/ordens`; isso é normal e não compartilha dados sem login.
+
+A página volta ao início somente ao trocar de tela ou de passo do assistente. Atualizações automáticas de sincronização não alteram a posição de leitura.
 
 Se você abrir um endereço antigo de outra área, o sistema volta automaticamente para **Ordens de serviço**. Nenhum dado é apagado nesse redirecionamento.
 
@@ -108,25 +112,21 @@ Cliente e veículo são opcionais. Você pode registrar a O.S. somente com o pro
 
 #### Identificar o cliente
 
-Escolha uma das opções:
+Preencha **Nome do cliente** e **Telefone / WhatsApp** diretamente na O.S., sem criar cadastro.
 
-- **Cliente cadastrado:** selecione uma pessoa já usada em outra O.S. O nome e o telefone do cadastro são reaproveitados.
-- **Dados diretamente na O.S.:** preencha **Nome do cliente** e **Telefone / WhatsApp** sem criar cadastro.
-- **Cadastrar cliente:** abre uma janela dentro da O.S. Para esse cadastro formal, nome e telefone são obrigatórios; o e-mail é opcional. Ao salvar, o cliente é selecionado automaticamente.
+Se quiser manter um cadastro para reutilizar os dados, clique em **Cadastrar cliente**. Para esse cadastro formal, nome e telefone são obrigatórios; o e-mail é opcional. Ao salvar, os dados do cliente são preenchidos automaticamente na O.S.
 
 O telefone da O.S. tem prioridade sobre o telefone do cadastro. Para liberar o WhatsApp, informe um telefone brasileiro válido com DDD, como `(27) 99999-1010`.
 
 #### Identificar o veículo
 
-Escolha uma das opções:
+Preencha **Placa** e **Veículo / modelo** diretamente na O.S., sem criar cadastro.
 
-- **Veículo cadastrado:** depois de selecionar um cliente cadastrado, escolha um veículo já vinculado a ele.
-- **Dados diretamente na O.S.:** preencha **Placa** e **Veículo / modelo**, sem criar cadastro.
-- **Cadastrar veículo:** abre uma janela dentro da O.S. Cliente e placa são obrigatórios nesse cadastro formal; os demais dados são opcionais. Ao salvar, o veículo é selecionado automaticamente.
+Se quiser manter um cadastro, clique em **Cadastrar veículo**. A janela pede um cliente cadastrado e a placa; os demais dados são opcionais. Ao salvar, a placa e a descrição do veículo são preenchidas automaticamente na O.S.
 
 A janela de cadastro de veículo não recarrega a página. Os dados já digitados na O.S. são mantidos.
 
-Você também pode informar **KM atual**, **data de abertura**, **previsão de entrega** e **problema relatado / serviço solicitado**. Cliente, veículo e previsão podem ficar em branco.
+Você também pode informar **KM atual**, **data de abertura** e **problema relatado / serviço solicitado**. Cliente e veículo podem ficar em branco.
 
 Clique em **Continuar para peças e serviços**.
 
@@ -142,7 +142,7 @@ Adicione pelo menos um item antes de continuar.
 4. Informe **quantidade** e **valor unitário**.
 5. Confira o aviso de estoque e clique em **Adicionar peça**.
 
-A quantidade pode ter casas decimais quando a unidade permitir. O sistema avisa quando a quantidade informada é maior que o estoque disponível.
+A quantidade pode ter casas decimais quando a unidade permitir. O sistema avisa quando a quantidade informada é maior que o estoque disponível. Para cadastrar peças ou repor o estoque antes de atender, abra **Estoque** no menu.
 
 #### Adicionar mão de obra
 
@@ -162,11 +162,11 @@ Confira cliente, veículo, itens e valores. Se precisar alterar os itens, clique
 Preencha:
 
 - **Número da O.S.**
-- **Status**
 - **Desconto (R$)**
 - **Forma de pagamento**
-- **Pagamento já recebido**, disponível quando a O.S. estiver faturada
 - **Observações da O.S.**
+
+A O.S. nova é salva somente como **Orçamento**. Não há escolha de status nem marcação de pagamento recebido no formulário; depois de salva, use os botões nos detalhes da ordem para aprovar, faturar, cancelar ou registrar o recebimento.
 
 O desconto não pode ser maior que o subtotal dos itens. As formas de pagamento são **Dinheiro**, **PIX**, **Cartão de débito**, **Cartão de crédito**, **Boleto** e **Transferência**.
 
@@ -201,7 +201,7 @@ Ao excluir uma O.S., as peças que haviam sido baixadas são estornadas. As O.S.
 
 ### Orçamento
 
-É o status inicial. Serve para conferir e enviar o orçamento antes da aprovação. Nenhuma peça sai do estoque.
+É o único status usado ao salvar uma O.S. nova. Serve para conferir e enviar o orçamento antes da aprovação. Nenhuma peça sai do estoque.
 
 Quando o cliente aprovar, clique em **Cliente aprovou**.
 
@@ -213,7 +213,7 @@ Quando o serviço terminar, clique em **Faturar O.S.**
 
 ### Faturada
 
-Indica que o serviço foi concluído e faturado. Nesse status, você pode:
+Indica que o serviço foi concluído e faturado. O recebimento é controlado nos detalhes da própria O.S., sem uma tela separada de contas a receber. Nesse status, você pode:
 
 - Clicar em **Marcar como recebida** quando o pagamento entrar.
 - Clicar em **Marcar como não pago** se precisar corrigir o recebimento.
@@ -223,17 +223,51 @@ Indica que o serviço foi concluído e faturado. Nesse status, você pode:
 
 Encerra a O.S. sem faturamento. Se as peças já haviam sido baixadas, elas voltam ao estoque. Uma O.S. cancelada pode ser **reaberta como orçamento**.
 
-### Como o estoque é usado
+O consumo de peças pela O.S. segue as regras da seção **Estoque da loja**. O orçamento não baixa estoque; a aprovação faz a saída automática uma única vez.
 
-Não existe uma tela separada de estoque. O controle acontece dentro da O.S.:
+## 6. Estoque da loja {#estoque}
 
-- Orçamento não baixa peças.
-- Aprovação baixa as peças usadas.
-- Cancelamento, reabertura, exclusão ou alteração dos itens faz os ajustes necessários para não duplicar a saída.
-- O sistema não permite aprovar uma O.S. com quantidade de peça maior que o disponível.
-- Peças diferentes continuam separadas; itens da mesma peça são somados antes da baixa.
+A tela **Estoque** é independente das O.S. Ela mostra o total de peças cadastradas, as unidades disponíveis, o valor de custo e os alertas de reposição.
 
-## 6. WhatsApp, impressão e PDF {#mensagens}
+### Cadastrar uma peça
+
+1. Abra **Estoque** no menu e clique em **Nova peça**.
+2. Informe o nome e, se quiser, código, marca, categoria, unidade, fornecedor, localização, preços e estoque mínimo.
+3. Informe o **estoque inicial**.
+4. Clique em **Salvar peça**. O estoque inicial fica registrado como entrada no histórico.
+
+Para alterar dados da peça, use o lápis na lista. A quantidade em estoque não é editada diretamente: use **Entrada / saída** para preservar o histórico.
+
+### Dar entrada ou saída manual
+
+1. Em **Estoque**, clique em **Entrada / saída**.
+2. Escolha a peça e o tipo **Entrada** ou **Saída**.
+3. Informe a quantidade, o motivo, a data e, se quiser, uma referência, como o número da nota fiscal.
+4. Clique em **Registrar movimentação**.
+
+Entradas aumentam o saldo. Saídas diminuem o saldo e não podem ser maiores que a quantidade disponível. Toda operação guarda o saldo anterior, o saldo novo, a data, o motivo e a referência.
+
+Não registre uma saída manual para uma peça usada em O.S. O sistema faz essa baixa automaticamente quando a ordem é aprovada.
+
+### Consultar histórico e alertas
+
+- Clique em **Histórico** na linha da peça para ver todas as entradas e saídas dela.
+- Clique em **Movimentações** para consultar o histórico geral e filtrar por entradas ou saídas.
+- O aviso **Repor** aparece quando o saldo chega ao estoque mínimo ou fica abaixo dele.
+- O número ao lado de **Estoque** no menu indica quantas peças precisam de reposição.
+
+### Baixa automática pelas O.S.
+
+- **Orçamento:** não baixa peças.
+- **Aprovada:** baixa as peças usadas uma única vez. Itens da mesma peça são somados antes da baixa.
+- **Faturada:** não faz nova baixa, pois as peças já foram descontadas na aprovação.
+- **Cancelada ou reaberta:** devolve ao estoque as peças que haviam sido baixadas.
+- **Edição dos itens:** estorna a quantidade anterior e registra a nova quantidade, sem duplicar a saída.
+- **Exclusão da O.S.:** devolve as peças baixadas ao estoque.
+
+O sistema não permite aprovar uma O.S. com quantidade de peça maior que o disponível. Nesse caso, registre uma entrada em **Estoque** ou ajuste os itens da ordem antes de aprovar.
+
+## 7. WhatsApp, impressão e PDF {#mensagens}
 
 ### Enviar uma mensagem pelo WhatsApp
 
@@ -257,7 +291,7 @@ O sistema **não envia mensagens sozinho** e não guarda o conteúdo da conversa
 
 O documento impresso usa fundo branco, mesmo com o tema claro do sistema. Para imprimir o manual, abra **Ajuda e manual**, role até o final e clique em **Imprimir manual**.
 
-## 7. Dados, segurança e conservação {#seguranca}
+## 8. Dados, segurança e conservação {#seguranca}
 
 - Use somente a chave pública do Supabase no navegador. A chave privada `service_role` nunca deve ser usada no sistema.
 - Não coloque senhas, tokens ou dados pessoais em links, mensagens ou arquivos do projeto.
@@ -270,7 +304,7 @@ O documento impresso usa fundo branco, mesmo com o tema claro do sistema. Para i
 
 Se o navegador informar que o armazenamento está cheio, leia o aviso na tela e evite limpar os dados do site. Entre novamente com a mesma conta e confira a sincronização.
 
-## 8. Solução de problemas {#problemas}
+## 9. Solução de problemas {#problemas}
 
 ### A página recarrega ao cadastrar o veículo na O.S.
 
@@ -296,7 +330,7 @@ O sistema somente prepara o texto e abre o WhatsApp. Revise a conversa e toque e
 
 ### A O.S. não pode ser aprovada
 
-Verifique se há peças em quantidade suficiente. Orçamentos não baixam estoque, mas a aprovação exige que todas as peças usadas estejam disponíveis. Corrija os itens da O.S. antes de aprovar.
+Verifique se há peças em quantidade suficiente. Orçamentos não baixam estoque, mas a aprovação exige que todas as peças usadas estejam disponíveis. Abra **Estoque** para dar entrada ou corrija os itens da O.S. antes de aprovar.
 
 ### O número da O.S. já existe
 
@@ -314,7 +348,7 @@ Cada número é único. Altere o número na revisão para um valor ainda não us
 
 Entre novamente com a mesma conta. As alterações pendentes deste dispositivo serão enviadas depois do novo acesso. O sistema não confunde sessão expirada com falta de internet.
 
-## 9. Perguntas frequentes {#faq}
+## 10. Perguntas frequentes {#faq}
 
 ### Preciso cadastrar cliente e veículo para abrir uma O.S.?
 
@@ -328,9 +362,9 @@ Dentro da própria O.S., no passo 1. O cadastro é opcional e serve para reutili
 
 Não. Ele salva a O.S. e prepara a mensagem. Você revisa e envia no WhatsApp.
 
-### Existe estoque, compras ou financeiro separado?
+### Existe estoque separado?
 
-Não. O sistema é somente para O.S. As peças são controladas internamente para a baixa e o estorno, e o pagamento é acompanhado na própria ordem.
+Sim. Abra **Estoque** no menu para cadastrar peças, dar entradas e saídas manuais e consultar o histórico. As peças usadas em O.S. aprovadas são baixadas automaticamente, sem necessidade de saída manual. Não há telas separadas de compras ou financeiro.
 
 ### Posso trabalhar sem internet?
 
@@ -340,7 +374,7 @@ Sim, depois que o sistema e os dados da conta já foram carregados. As alteraç�
 
 Eles continuam preservados. Se for necessário migrar dados locais antigos, o sistema pede uma escolha explícita antes de substituir qualquer versão.
 
-## 10. Manutenção deste manual {#manutencao}
+## 11. Manutenção deste manual {#manutencao}
 
 O manual deve acompanhar o aplicativo. Toda mudança funcional, de interface ou de dados deve atualizar `MANUAL.md` na mesma alteração, incluindo rótulos, validações, fluxos, status, estoque, pagamento, mensagens e recursos novos ou removidos.
 
@@ -352,4 +386,4 @@ O manual deve acompanhar o aplicativo. Toda mudança funcional, de interface ou 
 
 ---
 
-Franlin Car Veículos · Manual do usuário · Versão 1.2.0
+Franlin Car Veículos · Manual do usuário · Versão 1.3.0

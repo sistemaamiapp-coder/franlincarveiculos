@@ -27,7 +27,7 @@ export const EXPENSE_CATEGORIES = [
 ];
 export const STOCK_REASONS = {
   Entrada: ['Compra de peças', 'Estoque inicial', 'Devolução de cliente', 'Contagem de inventário', 'Ajuste manual de estoque'],
-  Saída: ['Peça usada em ordem de serviço', 'Venda balcão', 'Devolução ao fornecedor', 'Perda ou dano', 'Ajuste manual de estoque']
+  Saída: ['Venda balcão', 'Devolução ao fornecedor', 'Perda ou dano', 'Ajuste manual de estoque']
 };
 
 const ARRAY_KEYS = ['clientes', 'veiculos', 'fornecedores', 'pecas', 'movimentacoes', 'ordens', 'compras', 'despesas'];
@@ -383,7 +383,7 @@ export function deletePeca(id) {
   save();
 }
 
-function addMovementInternal(pecaId, delta, { motivo, referencia, data, tipo } = {}) {
+function addMovementInternal(pecaId, delta, { motivo, referencia, data, tipo, ordemId } = {}) {
   const peca = pecaById(pecaId);
   if (!peca) return null;
   const before = Number(peca.quantidadeEstoque) || 0;
@@ -399,6 +399,7 @@ function addMovementInternal(pecaId, delta, { motivo, referencia, data, tipo } =
     saldoNovo: after,
     motivo: String(motivo || (delta >= 0 ? 'Entrada manual de estoque' : 'Saída manual de estoque')),
     referencia: String(referencia || ''),
+    ordemId: String(ordemId || ''),
     data: data || nowISO(),
     usuarioNome: 'Sistema',
     criadoEm: nowISO()
@@ -478,12 +479,10 @@ function itemSignature(items) {
   })));
 }
 
-function applyStockToItems(items, direction, motivo, referencia) {
-  for (const item of items || []) {
-    if (item.tipo !== 'peca' || !item.pecaId) continue;
-    const quantity = Math.abs(Number(item.quantidade) || 0);
+function applyStockToItems(items, direction, motivo, referencia, ordemId) {
+  for (const [partId, quantity] of quantitiesByPart(items)) {
     if (!quantity) continue;
-    addMovementInternal(item.pecaId, direction * quantity, { motivo, referencia });
+    addMovementInternal(partId, direction * quantity, { motivo, referencia, ordemId });
   }
 }
 
@@ -573,11 +572,11 @@ export function saveOrder(input) {
 
   if (shouldDeduct && (!record.estoqueBaixado || itemsChanged)) validateOrderStock(items, old);
   if (record.estoqueBaixado && (!shouldDeduct || itemsChanged)) {
-    applyStockToItems(old.itens, 1, `Estorno de estoque (O.S. ${numero})`, reference);
+    applyStockToItems(old.itens, 1, `Estorno de estoque (O.S. ${numero})`, reference, record.id);
     record.estoqueBaixado = false;
   }
   if (shouldDeduct && (!record.estoqueBaixado || itemsChanged)) {
-    applyStockToItems(items, -1, `Baixa automática (O.S. ${numero})`, reference);
+    applyStockToItems(items, -1, `Baixa automática (O.S. ${numero})`, reference, record.id);
     record.estoqueBaixado = true;
   }
 
@@ -610,7 +609,7 @@ export function deleteOrder(id) {
   const order = ordemById(id);
   if (!order) return;
   if (order.estoqueBaixado) {
-    applyStockToItems(order.itens, 1, `Estorno de estoque (O.S. ${order.numero})`, `${order.numero} · ${order.clienteNome || 'Cliente não informado'}`);
+    applyStockToItems(order.itens, 1, `Estorno de estoque (O.S. ${order.numero})`, `${order.numero} · ${order.clienteNome || 'Cliente não informado'}`, order.id);
   }
   store.data.ordens = store.data.ordens.filter((item) => item.id !== id);
   save();

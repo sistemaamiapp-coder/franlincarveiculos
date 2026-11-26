@@ -187,23 +187,29 @@ test('ui: manual fica no final do menu e da página de ajuda', () => {
   assert.doesNotMatch(source, /setTimeout\(loadManualIntoPage/);
 });
 
-test('ui: sistema expõe apenas O.S. e mantém cliente e veículo opcionais', () => {
-  assert.equal(UI.NAV_GROUPS.length, 1);
-  assert.deepEqual(UI.NAV_GROUPS[0].items.map((item) => item.key), ['ordens']);
-  const shell = UI.shell({ path: '/ordens', content: '<p>Ordens</p>' });
+test('ui: sistema expõe O.S. e estoque e mantém cliente e veículo opcionais', () => {
+  assert.equal(UI.NAV_GROUPS.length, 2);
+  assert.deepEqual(UI.NAV_GROUPS.flatMap((group) => group.items.map((item) => item.key)), ['ordens', 'estoque']);
+  const shell = UI.shell({ path: '/ordens', content: '<p>Ordens</p>', counts: { openOrders: 2, stockAlerts: 1 } });
   assert.match(shell, /class="brand" href="#\/ordens"/);
-  for (const label of ['Painel', 'Peças em estoque', 'Compras', 'Fornecedores', 'Despesas', 'Contas e caixa', 'Clientes e veículos']) {
-    assert.ok(!shell.includes(label), `Menu fora do fluxo de O.S.: ${label}`);
+  assert.match(shell, /href="#\/estoque"/);
+  assert.match(shell, /aria-label="1 pendente\(s\)"/);
+  for (const label of ['Painel', 'Compras', 'Fornecedores', 'Despesas', 'Contas e caixa', 'Clientes e veículos']) {
+    assert.ok(!shell.includes(label), `Menu fora dos fluxos de O.S. e estoque: ${label}`);
   }
 
   const source = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
   const routeContent = source.slice(source.indexOf('function contentForPath('), source.indexOf('function notFoundView('));
   assert.match(routeContent, /if \(parts\[0\] === 'ordens'\)/);
+  assert.match(routeContent, /if \(parts\[0\] === 'estoque'\)/);
+  assert.match(routeContent, /movementsView\(\)/);
+  assert.match(routeContent, /stockView\(\)/);
   assert.match(routeContent, /if \(parts\[0\] === 'ajuda'\)/);
-  for (const route of ['dashboardView', 'stockView', 'purchasesView', 'expensesView', 'financeView', 'clientsView', 'suppliersView']) {
-    assert.ok(!routeContent.includes(route), `Rota fora do fluxo de O.S.: ${route}`);
+  for (const route of ['dashboardView', 'purchasesView', 'expensesView', 'financeView', 'clientsView', 'suppliersView']) {
+    assert.ok(!routeContent.includes(route), `Rota fora dos fluxos de O.S. e estoque: ${route}`);
   }
   const parseRoute = source.slice(source.indexOf('function parseRoute('), source.indexOf('function pathSegments('));
+  assert.match(parseRoute, /path === '\/estoque'/);
   assert.match(parseRoute, /path = '\/ordens'/);
   assert.match(parseRoute, /history\.replaceState/);
   const draft = source.slice(source.indexOf('function blankOsDraft()'), source.indexOf('function ensureOsDraft()'));
@@ -220,12 +226,20 @@ test('ui: sistema expõe apenas O.S. e mantém cliente e veículo opcionais', ()
   assert.match(stepOne, /name: 'veiculoPlaca'/);
   assert.match(stepOne, /name: 'veiculoDescricao'/);
   assert.doesNotMatch(stepOne, /required: true/);
+  assert.doesNotMatch(stepOne, /Cliente cadastrado|Veículo cadastrado|Previsão de entrega/);
   assert.doesNotMatch(stepOne, /Sem cliente não é possível abrir uma O.S./);
   assert.doesNotMatch(source, /Cliente salvo\. Agora cadastre o veículo\./);
   const orderActions = source.slice(source.indexOf('function nextOrderActions('), source.indexOf('function blankOsDraft()'));
   assert.match(orderActions, /const canSendWhatsApp = phoneLooksValid\(phone\)/);
   const review = source.slice(source.indexOf('function osStepThree('), source.indexOf('function stockView('));
   assert.match(review, /phoneLooksValid\(phone\) && draft\.itens\.length/);
+  assert.match(review, /Status: <strong>Orçamento<\/strong>/);
+  assert.doesNotMatch(review, /Pagamento já recebido|name: 'status'|name="pago"/);
+  assert.match(source, /const status = osDraft\.id \? osDraft\.status : 'Orçamento'/);
+  const render = source.slice(source.indexOf('function render('), source.indexOf('function quickAction('));
+  assert.match(render, /const routeChanged = lastRouteKey !== routeKey/);
+  assert.match(render, /if \(routeChanged \|\| scrollToTop\)/);
+  assert.match(render, /window\.scrollTo\(\{ top: previousScrollY/);
 
   const clientModal = source.slice(source.indexOf('function openClientModal('), source.indexOf('function openVehicleModal('));
   assert.match(clientModal, /Dados adicionais \(opcional\)/);
@@ -446,6 +460,7 @@ test('store: aprovação e faturamento baixam estoque uma vez', () => {
   assert.equal(S.pecaById(part.id).quantidadeEstoque, 8);
   assert.equal(S.store.data.movimentacoes.length, initialMovements + 1);
   assert.match(S.store.data.movimentacoes[0].motivo, /Baixa automática/);
+  assert.equal(S.store.data.movimentacoes[0].ordemId, order.id);
 
   order = S.setOrderStatus(order.id, 'Faturada');
   assert.equal(S.pecaById(part.id).quantidadeEstoque, 8);
@@ -485,6 +500,15 @@ test('store: aprovação direta soma linhas da mesma peça antes de baixar estoq
   assert.throws(() => S.setOrderStatus(order.id, 'Aprovada'), /Estoque insuficiente/);
   assert.equal(S.ordemById(order.id).status, 'Orçamento');
   assert.equal(S.pecaById(part.id).quantidadeEstoque, 3);
+
+  const validItems = items.map((item) => ({ ...item, quantidade: 1 }));
+  const validOrder = makeOrder({ client, vehicle, part, items: validItems });
+  const movementCount = S.store.data.movimentacoes.length;
+  S.setOrderStatus(validOrder.id, 'Aprovada');
+  assert.equal(S.pecaById(part.id).quantidadeEstoque, 1);
+  assert.equal(S.store.data.movimentacoes.length, movementCount + 1);
+  assert.equal(S.store.data.movimentacoes[0].quantidade, 2);
+  assert.equal(S.store.data.movimentacoes[0].ordemId, validOrder.id);
 });
 
 test('store: cancelar, reabrir e excluir restauram estoque', () => {
@@ -538,6 +562,7 @@ test('store: edição de itens reconcilia baixa e estorno', () => {
 });
 
 test('store: movimentação manual e alerta de estoque mínimo', () => {
+  assert.equal(S.STOCK_REASONS.Saída.includes('Peça usada em ordem de serviço'), false);
   const part = makePart({ quantidadeEstoque: 5, estoqueMinimo: 2 });
   const entry = S.adjustStock({ pecaId: part.id, tipo: 'Entrada', quantidade: 3, motivo: 'Contagem de inventário', data: '2026-11-22' });
   assert.equal(entry.saldoAnterior, 5);

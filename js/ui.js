@@ -81,6 +81,12 @@ export const NAV_GROUPS = [
     items: [
       { key: 'ordens', label: 'Ordens de serviço', href: '#/ordens', icon: 'os', badge: 'openOrders' }
     ]
+  },
+  {
+    label: 'Loja',
+    items: [
+      { key: 'estoque', label: 'Estoque', href: '#/estoque', icon: 'estoque', badge: 'stockAlerts' }
+    ]
   }
 ];
 
