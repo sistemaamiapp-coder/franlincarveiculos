@@ -8,7 +8,7 @@ import {
   vehicleTitle, fileStamp, nowISO, round2, isInMonth
 } from './util.js';
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 const root = document.getElementById('app');
 
 const viewState = {
@@ -45,10 +45,14 @@ const SERVICE_SUGGESTIONS = [
 function parseRoute() {
   const raw = String(location.hash || '#/').replace(/^#/, '') || '/';
   const [pathPart, queryPart = ''] = raw.split('?');
-  return {
-    path: pathPart.startsWith('/') ? pathPart : `/${pathPart}`,
-    query: new URLSearchParams(queryPart)
-  };
+  let path = pathPart.startsWith('/') ? pathPart : `/${pathPart}`;
+  const supported = path === '/ordens' || path.startsWith('/ordens/')
+    || path === '/ajuda' || path.startsWith('/ajuda/');
+  if (!supported) {
+    path = '/ordens';
+    history.replaceState(null, '', `${location.pathname}${location.search}#/ordens`);
+  }
+  return { path, query: new URLSearchParams(queryPart) };
 }
 
 function pathSegments(path) {
@@ -70,45 +74,26 @@ function navigate(path) {
 
 function titleForPath(path) {
   const parts = pathSegments(path);
-  if (!parts.length) return 'Painel';
   if (parts[0] === 'ordens') {
     if (parts[1] === 'nova') return 'Nova ordem de serviço';
     if (parts[1] && parts[2] === 'editar') return 'Editar ordem de serviço';
     const order = parts[1] ? S.ordemById(parts[1]) : null;
     return order ? `O.S. ${order.numero}` : 'Ordens de serviço';
   }
-  if (parts[0] === 'estoque') return parts[1] === 'movimentacoes' ? 'Movimentações de estoque' : 'Peças em estoque';
-  if (parts[0] === 'compras') return parts[1] === 'nova' ? 'Nova compra' : 'Compras';
-  if (parts[0] === 'despesas') return 'Despesas';
-  if (parts[0] === 'financeiro') return 'Contas e caixa';
-  if (parts[0] === 'clientes') return 'Clientes';
-  if (parts[0] === 'fornecedores') return 'Fornecedores';
   if (parts[0] === 'ajuda') return 'Ajuda e manual';
-  return 'Franlin Car Veículos';
+  return 'Ordens de serviço';
 }
 
-function contentForPath(path, query) {
+function contentForPath(path) {
   const parts = pathSegments(path);
-  if (!parts.length) return dashboardView();
-  switch (parts[0]) {
-    case 'ordens':
-      if (parts[1] === 'nova') return orderFormView(null);
-      if (parts[1] && parts[2] === 'editar') return orderFormView(parts[1]);
-      if (parts[1]) return orderDetailView(parts[1]);
-      return ordersView();
-    case 'estoque':
-      if (parts[1] === 'movimentacoes') return movementsView();
-      return stockView(query);
-    case 'compras':
-      if (parts[1] === 'nova') return purchaseFormView();
-      return purchasesView();
-    case 'despesas': return expensesView();
-    case 'financeiro': return financeView();
-    case 'clientes': return clientsView(query);
-    case 'fornecedores': return suppliersView();
-    case 'ajuda': return helpView(path);
-    default: return notFoundView();
+  if (parts[0] === 'ordens') {
+    if (parts[1] === 'nova') return orderFormView(null);
+    if (parts[1] && parts[2] === 'editar') return orderFormView(parts[1]);
+    if (parts[1]) return orderDetailView(parts[1]);
+    return ordersView();
   }
+  if (parts[0] === 'ajuda') return helpView(path);
+  return ordersView();
 }
 
 function notFoundView() {
@@ -189,16 +174,6 @@ function render() {
   requestAnimationFrame(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
   });
-  if (route.path === '/clientes' && route.query.get('cliente')) {
-    const id = route.query.get('cliente');
-    history.replaceState(null, '', `${location.pathname}${location.search}#/clientes`);
-    setTimeout(() => openVehiclesModal(id), 40);
-  }
-  if (route.path === '/estoque' && route.query.get('entrada')) {
-    const id = route.query.get('peca') || '';
-    history.replaceState(null, '', `${location.pathname}${location.search}#/estoque`);
-    setTimeout(() => openMovementModal(id), 40);
-  }
   if (route.path.startsWith('/ajuda')) loadManualIntoPage();
 }
 
@@ -357,20 +332,18 @@ function ordersView() {
   const open = all.filter((order) => order.status === 'Orçamento' || order.status === 'Aprovada');
   const billed = all.filter((order) => order.status === 'Faturada');
   const unpaid = billed.filter((order) => !order.pago);
-  const total = sum(all.filter((order) => order.status !== 'Cancelada'), (order) => order.total);
   return `
     <div class="page-wrap">
       ${U.pageHead({
         title: 'Ordens de serviço',
-        subtitle: 'Registre o serviço com ou sem cliente e veículo. As peças saem do estoque quando a O.S. é aprovada.',
+        subtitle: 'Crie, acompanhe e envie suas ordens de serviço. Cliente e veículo são opcionais.',
         help: 'ordens',
         actions: `<a class="btn btn-primary" href="#/ordens/nova">${icon('plus')}Nova O.S.</a>`
       })}
-      <section class="stats-grid stats-grid-4">
+      <section class="stats-grid stats-grid-3">
         ${U.statCard({ label: 'Em andamento', value: String(open.length), iconName: 'os', tone: 'blue' })}
         ${U.statCard({ label: 'Faturadas', value: String(billed.length), iconName: 'checkCircle', tone: 'green' })}
         ${U.statCard({ label: 'A receber', value: money(sum(unpaid, (order) => order.total)), iconName: 'caixa', tone: 'amber' })}
-        ${U.statCard({ label: 'Total não cancelado', value: money(total), iconName: 'painel', tone: 'neutral' })}
       </section>
       <section class="card">
         <div class="filter-row">
@@ -508,7 +481,7 @@ function orderDetailView(id) {
               ${order.clienteDocumento ? `<div><dt>CPF / CNPJ</dt><dd>${esc(order.clienteDocumento)}</dd></div>` : ''}
               ${order.clienteEndereco ? `<div><dt>Endereço</dt><dd>${esc(order.clienteEndereco)}</dd></div>` : ''}
             </dl>
-            ${client ? `<a class="btn btn-secondary btn-block" href="#/clientes?cliente=${esc(client.id)}">${icon('clientes')}Abrir cadastro do cliente</a>` : ''}
+            ${client ? `<button type="button" class="btn btn-secondary btn-block" data-action="clientVehicles" data-id="${esc(client.id)}">${icon('carro')}Gerenciar veículos do cliente</button>` : ''}
           </section>
 
           <section class="card">
@@ -1299,14 +1272,11 @@ function expensePayableRow(expense) {
 
 function helpView(path) {
   const section = pathSegments(path)[1] || '';
-  const data = S.store.data;
-  const empty = S.isStoreEmpty();
-  const lastBackup = data.meta.lastBackupAt;
   return `
     <div class="page-wrap help-page">
       ${U.pageHead({
         title: 'Ajuda',
-        subtitle: 'Ferramentas e orientações de segurança. O manual completo fica no final desta página.'
+        subtitle: 'Conta, sincronização e manual. O manual completo fica no final desta página.'
       })}
       <section class="backup-card">
         <div class="backup-copy">
@@ -1316,19 +1286,6 @@ function helpView(path) {
         <div class="backup-actions">
           <button type="button" class="btn btn-secondary" data-action="syncNow">${icon('relogio')}Sincronizar agora</button>
           <button type="button" class="btn btn-danger-ghost btn-small" data-action="signOut">Sair da conta</button>
-        </div>
-      </section>
-      <section class="backup-card">
-        <div class="backup-copy">
-          <span class="backup-icon">${icon('banco')}</span>
-          <div><h2>Cópia de segurança</h2><p>Baixe uma cópia toda semana e antes de restaurar ou apagar dados. O arquivo contém informações da oficina e deve ser guardado em local seguro.</p><small>${lastBackup ? `Última cópia: ${esc(fmtDateTime(lastBackup))}` : 'Você ainda não fez uma cópia.'} · ${data.clientes.length} cliente(s) · ${data.ordens.length} O.S. · ${data.pecas.length} peça(s)</small></div>
-        </div>
-        <div class="backup-actions">
-          <button type="button" class="btn btn-primary" data-action="exportBackup">${icon('baixar')}Baixar cópia</button>
-          <button type="button" class="btn btn-secondary" data-action="importBackup">${icon('subir')}Restaurar cópia</button>
-          <input type="file" id="backup-file" accept="application/json,.json" hidden>
-          ${empty ? `<button type="button" class="btn btn-ghost" data-action="loadDemo">${icon('painel')}Carregar dados de exemplo</button>` : ''}
-          <button type="button" class="btn btn-danger-ghost btn-small" data-action="clearAll">${icon('lixeira')}Apagar todos os dados</button>
         </div>
       </section>
       <section class="manual-card" id="manual-content" data-section="${esc(section)}">
@@ -2557,6 +2514,7 @@ const LIST_RENDERERS = {
 document.addEventListener('click', async (event) => {
   const trigger = event.target.closest('[data-action]');
   if (!trigger) return;
+  if (trigger instanceof HTMLButtonElement) event.preventDefault();
   const action = trigger.dataset.action;
   const id = trigger.dataset.id || '';
   try {

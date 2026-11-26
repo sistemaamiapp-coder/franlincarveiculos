@@ -179,20 +179,33 @@ test('ui: manual fica no final do menu e da página de ajuda', () => {
   const source = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
   const helpView = source.slice(source.indexOf('function helpView('), source.indexOf('async function getManual()'));
   assert.ok(helpView.indexOf('backup-card') < helpView.indexOf('manual-content'));
+  assert.doesNotMatch(helpView, /data-action="(?:exportBackup|importBackup|loadDemo|clearAll)"/);
+  assert.match(helpView, /data-action="syncNow"/);
   assert.doesNotMatch(helpView, /data-action="printManual"/);
   assert.ok(source.indexOf('data-action="printManual"') > source.indexOf('class="manual-toolbar"'));
   assert.match(source, /route\.path\.startsWith\('\/ajuda'\)\) loadManualIntoPage\(\)/);
   assert.doesNotMatch(source, /setTimeout\(loadManualIntoPage/);
 });
 
-test('ui: O.S. é prioridade e cliente e veículo são opcionais', () => {
-  assert.equal(UI.NAV_GROUPS[0].items[0].key, 'ordens');
-  assert.equal(UI.NAV_GROUPS.at(-1).items[0].key, 'clientes');
+test('ui: sistema expõe apenas O.S. e mantém cliente e veículo opcionais', () => {
+  assert.equal(UI.NAV_GROUPS.length, 1);
+  assert.deepEqual(UI.NAV_GROUPS[0].items.map((item) => item.key), ['ordens']);
   const shell = UI.shell({ path: '/ordens', content: '<p>Ordens</p>' });
   assert.match(shell, /class="brand" href="#\/ordens"/);
-  assert.ok(shell.indexOf('Ordens de serviço') < shell.indexOf('Painel'));
+  for (const label of ['Painel', 'Peças em estoque', 'Compras', 'Fornecedores', 'Despesas', 'Contas e caixa', 'Clientes e veículos']) {
+    assert.ok(!shell.includes(label), `Menu fora do fluxo de O.S.: ${label}`);
+  }
 
   const source = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+  const routeContent = source.slice(source.indexOf('function contentForPath('), source.indexOf('function notFoundView('));
+  assert.match(routeContent, /if \(parts\[0\] === 'ordens'\)/);
+  assert.match(routeContent, /if \(parts\[0\] === 'ajuda'\)/);
+  for (const route of ['dashboardView', 'stockView', 'purchasesView', 'expensesView', 'financeView', 'clientsView', 'suppliersView']) {
+    assert.ok(!routeContent.includes(route), `Rota fora do fluxo de O.S.: ${route}`);
+  }
+  const parseRoute = source.slice(source.indexOf('function parseRoute('), source.indexOf('function pathSegments('));
+  assert.match(parseRoute, /path = '\/ordens'/);
+  assert.match(parseRoute, /history\.replaceState/);
   const draft = source.slice(source.indexOf('function blankOsDraft()'), source.indexOf('function ensureOsDraft()'));
   for (const field of ['clienteNome', 'clienteTelefone', 'veiculoPlaca', 'veiculoDescricao']) {
     assert.ok(draft.includes(`${field}: ''`), `Campo opcional ausente no rascunho: ${field}`);
@@ -221,6 +234,11 @@ test('ui: O.S. é prioridade e cliente e veículo são opcionais', () => {
   assert.doesNotMatch(clientModal, /label: 'E-mail'[^\n]*required: true/);
   const vehicleModal = source.slice(source.indexOf('function openVehicleModal('), source.indexOf('function openVehiclesModal('));
   assert.match(vehicleModal, /Outros dados do veículo \(opcional\)/);
+  assert.match(stepOne, /<button type="button"[^>]*data-action="osNewVehicle"/);
+  const clickHandler = source.slice(source.indexOf("document.addEventListener('click'"), source.indexOf("document.addEventListener('submit'"));
+  assert.match(clickHandler, /trigger instanceof HTMLButtonElement\) event\.preventDefault\(\)/);
+  const uiSource = readFileSync(new URL('../js/ui.js', import.meta.url), 'utf8');
+  assert.match(uiSource, /dialog\.querySelector\('form\[data-form\]'\)\?\.addEventListener\('submit', \(event\) => event\.preventDefault\(\)\)/);
 });
 
 test('interface: tema claro e versões sincronizadas', () => {

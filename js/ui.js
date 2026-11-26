@@ -79,29 +79,7 @@ export const NAV_GROUPS = [
   {
     label: 'Atendimento',
     items: [
-      { key: 'ordens', label: 'Ordens de serviço', href: '#/ordens', icon: 'os', badge: 'openOrders' },
-      { key: 'painel', label: 'Painel', href: '#/', icon: 'painel' }
-    ]
-  },
-  {
-    label: 'Estoque e compras',
-    items: [
-      { key: 'estoque', label: 'Peças em estoque', href: '#/estoque', icon: 'estoque', badge: 'stockAlerts' },
-      { key: 'compras', label: 'Compras', href: '#/compras', icon: 'compras' },
-      { key: 'fornecedores', label: 'Fornecedores', href: '#/fornecedores', icon: 'fornecedores' }
-    ]
-  },
-  {
-    label: 'Financeiro',
-    items: [
-      { key: 'despesas', label: 'Despesas', href: '#/despesas', icon: 'despesas' },
-      { key: 'financeiro', label: 'Contas e caixa', href: '#/financeiro', icon: 'caixa', badge: 'pendingBills' }
-    ]
-  },
-  {
-    label: 'Cadastros auxiliares',
-    items: [
-      { key: 'clientes', label: 'Clientes e veículos', href: '#/clientes', icon: 'clientes' }
+      { key: 'ordens', label: 'Ordens de serviço', href: '#/ordens', icon: 'os', badge: 'openOrders' }
     ]
   }
 ];
@@ -440,6 +418,7 @@ export function openModal({ title, subtitle = '', body = '', footer = '', size =
       backdrop.removeEventListener('mousedown', onBackdrop);
     }
   };
+  dialog.querySelector('form[data-form]')?.addEventListener('submit', (event) => event.preventDefault());
   const focusTarget = dialog.querySelector('input:not([type="hidden"]), select, textarea, button');
   setTimeout(() => focusTarget?.focus(), 30);
   if (onMount) onMount(dialog, close);

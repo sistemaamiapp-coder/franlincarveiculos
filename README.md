@@ -1,23 +1,20 @@
 # Franlin Car Veículos
 
-Sistema de gestão para oficina, em português brasileiro, com frontend estático, conta por e-mail/senha e sincronização na nuvem. A versão atual é **1.1.0**.
+Sistema simples de ordens de serviço para oficina, em português brasileiro, com frontend estático, conta por e-mail/senha e sincronização na nuvem. A versão atual é **1.2.0**.
 
 ## Recursos
 
-- Ordens de serviço como tela inicial e recurso principal, com assistente de três passos, peças, mão de obra, desconto e pagamento.
+- Ordens de serviço como única área de trabalho, com assistente de três passos, peças, mão de obra, desconto e pagamento.
 - Abertura de O.S. sem cliente ou veículo, ou com nome, telefone, placa e descrição informados diretamente na O.S.
-- Cadastros opcionais de clientes e veículos, inclusive dentro da própria O.S.; o cadastro de cliente exige nome e telefone, mas não e-mail.
-- Cadastros auxiliares de fornecedores e catálogo de peças para reutilizar dados.
-- Status Orçamento, Aprovada, Faturada e Cancelada, com baixa e estorno automático de estoque.
-- Movimentações de estoque, compras, despesas, contas a receber e a pagar.
-- Resumo mensal de caixa baseado nas datas de pagamento.
+- Cadastros opcionais de clientes e veículos dentro da própria O.S.; o cadastro de cliente exige nome e telefone, mas não e-mail.
+- Status Orçamento, Aprovada, Faturada e Cancelada, com baixa e estorno automático das peças usadas.
 - Mensagens preparadas para confirmação e envio manual no WhatsApp, usando o telefone informado na O.S. ou no cadastro.
 - Impressão da O.S. e salvamento em PDF pelo navegador.
-- Cópia de segurança JSON, restauração, limpeza e dados de exemplo.
 - Interface em tema claro, com controles grandes e três tamanhos de letra.
-- Manual completo incorporado ao sistema, após as ferramentas de ajuda.
+- Manual completo incorporado ao sistema, após as informações da conta.
 - Supabase Auth, isolamento por usuário, cache local, operação offline e sincronização automática.
 - Controle de concorrência por revisão, idempotência por mutation ID e resolução explícita de conflitos.
+- Endereços antigos de outras áreas são redirecionados para as ordens de serviço, sem apagar dados.
 
 ## Endereço de publicação
 
@@ -54,17 +51,17 @@ Para usar login e nuvem na prévia, copie `config.example.json` para `config.jso
 3. Em **Authentication > URL Configuration**, cadastre o endereço publicado como Site URL e inclua os endereços de redirecionamento usados para confirmação de e-mail e recuperação de senha. Para prévia local, inclua o endereço local correspondente.
 4. Copie a **Project URL** e a chave pública **anon** para `config.json` no ambiente local. Nunca use a chave `service_role` no navegador.
 5. No repositório GitHub, cadastre os secrets `SUPABASE_URL` e `SUPABASE_ANON_KEY`. O workflow gera `config.json` somente no artefato de publicação da branch `main`; os valores não são gravados no Git.
-6. Publique e valide criação de conta, confirmação de e-mail, recuperação de senha, isolamento entre contas e sincronização entre dois dispositivos.
+6. Publique e valide criação e acesso à conta, recuperação de senha, isolamento entre contas e sincronização entre dois dispositivos.
 
 O Supabase pode ter custos conforme o uso e exige internet para o primeiro acesso e para receber dados de outros dispositivos. Depois de carregar a conta uma vez, o aplicativo mantém cache local e alterações offline, mas o service worker não armazena respostas da API.
 
-## Dados, sincronização e cópias
+## Dados e sincronização
 
 Cada conta possui um workspace JSONB com o estado completo da aplicação. O cliente usa a API REST do Supabase, sem SDK. O cache é separado por usuário e dispositivo; a chave legada `fcv.store.v1` é reconhecida para migração explícita.
 
 As alterações são guardadas primeiro no dispositivo e enviadas depois. Cada envio usa uma revisão de base e um `mutation_id`; respostas perdidas podem ser repetidas sem duplicar a revisão. Se a nuvem estiver em uma revisão diferente, o aplicativo bloqueia alterações e mostra as duas opções de resolução. A versão anterior da nuvem é arquivada no servidor antes de uma substituição escolhida pela pessoa usuária.
 
-Use **Ajuda e manual > Baixar cópia** com frequência. O JSON exportado contém dados pessoais e financeiros, não é criptografado e deve ser guardado com segurança. Restaurar uma cópia ou apagar todos os dados substitui o conteúdo da conta e sincroniza essa substituição; sem internet, a operação fica pendente.
+O aplicativo não possui telas separadas de clientes, veículos, estoque, compras ou financeiro. Cliente e veículo são identificados diretamente na O.S. ou reutilizados por meio dos cadastros opcionais abertos dentro dela. As peças continuam sendo controladas internamente para preservar a baixa e o estorno corretos, mas não há uma tela separada de estoque. Use **Ajuda e manual > Sincronizar agora** para conferir a conexão com a nuvem.
 
 ## Manual
 
@@ -114,6 +111,6 @@ Requer Node.js 20 ou superior. Não há instalação de dependências.
 npm test
 ```
 
-O comando executa testes de formatação, armazenamento, O.S. com ou sem cadastros, estoque, compras, despesas, financeiro, interface, backup, autenticação REST, sincronização offline, retry, conflitos, schema/RLS, CSP e service worker. O GitHub Actions executa a mesma suíte e verifica se mudanças em `index.html`, `styles.css`, `js/*`, `assets/*`, `sw.js` ou `supabase/*.sql` também atualizaram `MANUAL.md`.
+O comando executa testes de formatação, armazenamento, O.S. com ou sem cadastros, regras de estoque e pagamento, interface, autenticação REST, sincronização offline, retry, conflitos, schema/RLS, CSP e service worker. O GitHub Actions executa a mesma suíte e verifica se mudanças em `index.html`, `styles.css`, `js/*`, `assets/*`, `sw.js` ou `supabase/*.sql` também atualizaram `MANUAL.md`.
 
 Não há marca d'água no sistema ou nos PDFs gerados pela impressão do navegador.
