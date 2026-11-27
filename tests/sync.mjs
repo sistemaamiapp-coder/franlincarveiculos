@@ -131,6 +131,70 @@ test('sync: migração legada exige escolha e versão local pode arquivar a nuve
   await dispose(manager);
 });
 
+test('sync: escolher a nuvem na migração cria o espaço mesmo sem dados remotos', async () => {
+  const client = new WorkspaceClient();
+  const { manager, localStorage } = environment(client);
+  localStorage.setItem('fcv.store.v1', JSON.stringify(stateWithOrder('computador')));
+  await manager.start();
+  assert.equal(manager.pendingMigration.local.ordens[0].problemaRelatado, 'computador');
+  await manager.resolveCloud();
+  assert.equal(client.remote.revision, 1);
+  assert.equal(client.remote.state.ordens.length, 0);
+  assert.equal(manager.state.ordens.length, 0);
+  assert.equal(manager.outboxPending, false);
+  assert.equal(manager.status, 'synced');
+  await dispose(manager);
+});
+
+test('sync: dados legados offline aguardam escolha explícita mesmo depois de reconectar', async () => {
+  const client = new WorkspaceClient();
+  client.fetchWorkspace = async () => { throw new Error('Sem conexão com a nuvem.'); };
+  const { manager, localStorage } = environment(client);
+  localStorage.setItem('fcv.store.v1', JSON.stringify(stateWithOrder('computador')));
+  await manager.start();
+  assert.equal(manager.pendingMigration.local.ordens[0].problemaRelatado, 'computador');
+  assert.equal(manager.outboxPending, false);
+  assert.equal(localStorage.getItem(manager.stateKey), null);
+  assert.equal(localStorage.getItem(manager.migratedKey), null);
+  assert.equal(client.remote, null);
+  await dispose(manager);
+
+  client.remote = { state: stateWithOrder('nuvem'), revision: 3, updatedAt: '2026-11-25T12:00:00Z' };
+  client.fetchWorkspace = WorkspaceClient.prototype.fetchWorkspace;
+  const reopened = new SyncManager(client, { localStorage, sessionStorage: new MemoryStorage(), channelFactory: null, polling: false });
+  await reopened.start();
+  assert.equal(reopened.pendingMigration.local.ordens[0].problemaRelatado, 'computador');
+  assert.equal(reopened.pendingMigration.remote.revision, 3);
+  assert.equal(reopened.outboxPending, false);
+  assert.equal(localStorage.getItem(reopened.migratedKey), null);
+  assert.equal(client.remote.state.ordens[0].problemaRelatado, 'nuvem');
+  await dispose(reopened);
+});
+
+test('sync: escolher a nuvem no conflito restaura a versão remota sem sobrescrevê-la', async () => {
+  const remoteState = stateWithOrder('nuvem');
+  const client = new WorkspaceClient({ state: remoteState, revision: 5, updatedAt: '2026-11-25T12:00:00Z' });
+  const { manager, localStorage } = environment(client);
+  const localState = stateWithOrder('computador');
+  localStorage.setItem(manager.stateKey, JSON.stringify(localState));
+  localStorage.setItem(manager.metaKey, JSON.stringify({
+    revision: 4,
+    syncedState: remoteState,
+    updatedAt: '2026-11-25T11:00:00Z',
+    outbox: { state: localState, baseRevision: 4, mutationId: '00000000-0000-4000-8000-000000000099', archiveRemote: false }
+  }));
+  await manager.start();
+  assert.equal(manager.status, 'conflict');
+  await manager.resolveCloud();
+  assert.equal(manager.conflict, null);
+  assert.equal(manager.state.ordens[0].problemaRelatado, 'nuvem');
+  assert.equal(manager.envelope.revision, 5);
+  assert.equal(manager.outboxPending, false);
+  assert.equal(manager.status, 'synced');
+  assert.equal(client.remote.state.ordens[0].problemaRelatado, 'nuvem');
+  await dispose(manager);
+});
+
 test('sync: edição concorrente bloqueia escrita e preserva as duas versões', async () => {
   const client = new WorkspaceClient({ state: S.createEmptyData(), revision: 1, updatedAt: '2026-11-25T10:00:00Z' });
   const first = environment(client);
@@ -233,9 +297,9 @@ test('sync: autenticação perdida no envio preserva a alteração para o próxi
   await dispose(reopened);
 });
 
-test('sync: alterações offline aguardam conexão sem perder o estado', async () => {
+test('sync: alterações offline sobrevivem à reabertura do navegador e são enviadas', async () => {
   const client = new WorkspaceClient();
-  const { manager } = environment(client);
+  const { manager, localStorage } = environment(client);
   await manager.start();
   manager.attachStore();
   navigator.onLine = false;
@@ -244,11 +308,18 @@ test('sync: alterações offline aguardam conexão sem perder o estado', async (
   assert.equal(manager.status, 'offline');
   assert.equal(manager.outboxPending, true);
   assert.equal(client.remote.state.ordens.length, 0);
-  navigator.onLine = true;
-  await manager.push();
-  assert.equal(manager.status, 'synced');
-  assert.equal(client.remote.state.ordens.length, 1);
+  const deviceId = manager.deviceId;
   await dispose(manager);
+
+  navigator.onLine = true;
+  const reopened = new SyncManager(client, { localStorage, sessionStorage: new MemoryStorage(), channelFactory: null, polling: false });
+  assert.equal(reopened.deviceId, deviceId);
+  await reopened.start();
+  assert.equal(reopened.outboxPending, false);
+  assert.equal(reopened.status, 'synced');
+  assert.equal(reopened.state.ordens.length, 1);
+  assert.equal(client.remote.state.ordens.length, 1);
+  await dispose(reopened);
 });
 
 test('sync: nova tentativa usa o mesmo mutation_id e não duplica a revisão', async () => {

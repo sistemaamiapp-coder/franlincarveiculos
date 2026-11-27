@@ -8,7 +8,7 @@ import {
   vehicleTitle, fileStamp, nowISO, round2, isInMonth
 } from './util.js';
 
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.4.2';
 const root = document.getElementById('app');
 
 const viewState = {

@@ -45,7 +45,8 @@ export class SyncManager {
     this.channelFactory = options.channelFactory || globalThis.BroadcastChannel;
     this.polling = options.polling !== false;
     this.user = client.user;
-    this.deviceId = this.sessionStorage?.getItem(DEVICE_KEY) || this.crypto.randomUUID();
+    this.deviceId = this.localStorage?.getItem(DEVICE_KEY) || this.sessionStorage?.getItem(DEVICE_KEY) || this.crypto.randomUUID();
+    this.localStorage?.setItem(DEVICE_KEY, this.deviceId);
     this.sessionStorage?.setItem(DEVICE_KEY, this.deviceId);
     this.stateKey = `fcv.state.v1:${this.user.id}:${this.deviceId}`;
     this.metaKey = `fcv.sync.v1:${this.user.id}:${this.deviceId}`;
@@ -179,14 +180,14 @@ export class SyncManager {
         this.setStatus('auth', 'Sua sessão expirou. Entre novamente para continuar.');
         return { offline: false, authExpired: true };
       }
-      const fallback = validLocal || this.readLegacy() || this.store.createEmptyData();
-      this.configureStore(fallback);
-      if (!validLocal && !emptyData(fallback)) {
-        this.envelope.outbox = { state: clone(fallback), baseRevision: 0, mutationId: this.crypto.randomUUID(), archiveRemote: false };
-        this.markLegacyMigrated();
-        this.writeEnvelope();
+      const legacy = this.readLegacy();
+      if (!validLocal && legacy && !emptyData(legacy)) {
+        this.pendingMigration = { local: legacy, remote: null, localRevision: 0 };
+        this.setStatus('pending', 'Existem dados antigos neste computador. Escolha como usá-los; a conexão será necessária para concluir a sincronização.');
+      } else {
+        this.configureStore(validLocal || this.store.createEmptyData());
+        this.setStatus('offline', error.message);
       }
-      this.setStatus('offline', error.message);
       this.startPolling();
       return { offline: true };
     }
@@ -393,7 +394,7 @@ export class SyncManager {
     }
   }
 
-  async resolveUseCloud() {
+  async resolveCloud() {
     const source = this.conflict?.remote || this.pendingMigration?.remote?.state;
     if (this.conflict || this.pendingMigration?.remote) {
       if (!source) throw new Error('Não há dados na nuvem para restaurar.');
@@ -401,6 +402,7 @@ export class SyncManager {
       this.envelope.revision = this.conflict?.remoteRevision || this.pendingMigration.remote.revision;
       this.envelope.syncedState = clone(source);
       this.envelope.updatedAt = this.conflict?.remoteUpdatedAt || this.pendingMigration.remote.updatedAt;
+      this.envelope.outbox = null;
     } else {
       const empty = this.store.createEmptyData();
       this.configureStore(empty);
@@ -408,13 +410,12 @@ export class SyncManager {
       this.envelope.syncedState = null;
       this.envelope.outbox = { state: clone(empty), baseRevision: 0, mutationId: this.crypto.randomUUID(), archiveRemote: false };
     }
-    this.envelope.outbox = null;
     this.conflict = null;
     this.pendingMigration = null;
     this.markLegacyMigrated();
     this.writeEnvelope();
-    this.setStatus('synced', 'Dados da nuvem selecionados.');
-    if (this.envelope.revision === 0) await this.push();
+    this.setStatus(this.envelope.outbox ? 'syncing' : 'synced', this.envelope.outbox ? 'Enviando a seleção para a nuvem…' : 'Dados da nuvem selecionados.');
+    if (this.envelope.outbox) await this.push();
   }
 
   async resolveUseDevice() {

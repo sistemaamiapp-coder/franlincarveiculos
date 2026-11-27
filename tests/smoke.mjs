@@ -258,7 +258,7 @@ test('ui: sistema expõe O.S. e estoque e mantém cliente e veículo opcionais',
 test('interface: tema claro azul e branco e versões sincronizadas', () => {
   const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
   const ui = readFileSync(new URL('../js/ui.js', import.meta.url), 'utf8');
-  const favicon = readFileSync(new URL('../assets/favicon.svg', import.meta.url), 'utf8');
+  const icon = readFileSync(new URL('../assets/icone-franlin-car.png', import.meta.url));
   const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
   assert.match(css, /color-scheme:\s*light/);
@@ -267,8 +267,12 @@ test('interface: tema claro azul e branco e versões sincronizadas', () => {
   assert.match(css, /--primary:\s*#145cc4/);
   assert.match(css, /--sidebar-bg:\s*#0c2d4d/);
   assert.doesNotMatch(css, /#b51624|#e11d2e|#a91421|#ef3342/);
-  assert.match(ui, /fill="#145cc4"/);
-  assert.match(favicon, /id="azul-franlin"/);
+  assert.match(ui, /assets\/icone-franlin-car\.png/);
+  assert.doesNotMatch(ui, /fill="#145cc4"/);
+  assert.equal(icon.subarray(1, 4).toString('ascii'), 'PNG');
+  assert.equal(icon.readUInt32BE(16), 512);
+  assert.equal(icon.readUInt32BE(20), 512);
+  assert.match(index, /rel="icon" href="\.\/assets\/icone-franlin-car\.png" type="image\/png"/);
   assert.match(index, /theme-color" content="#0c2d4d"/);
   assert.doesNotMatch(index, /financeiro/);
 
@@ -288,6 +292,7 @@ test('interface: marca do login fica visível e não oferece sessão temporária
   const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
   assert.match(login, /<span class="brand-copy">/);
   assert.match(login, /FRANLIN <span>CAR<\/span>/);
+  assert.match(login, /assets\/icone-franlin-car\.png/);
   assert.doesNotMatch(login, /Manter conectado|name="remember"/);
   assert.match(css, /\.auth-brand\s*\{[^}]*display:\s*flex/);
   assert.match(css, /\.auth-brand \.brand-copy strong\s*\{[^}]*color:\s*var\(--sidebar-bg\)/);
@@ -306,7 +311,8 @@ test('publicação: Vercel copia somente o shell e gera a configuração públic
     await import('../scripts/vercel-build.mjs?smoke=1');
     assert.equal(existsSync(new URL('index.html', output)), true);
     assert.equal(existsSync(new URL('js/app.js', output)), true);
-    assert.equal(existsSync(new URL('assets/favicon.svg', output)), true);
+    assert.equal(existsSync(new URL('assets/icone-franlin-car.png', output)), true);
+    assert.equal(existsSync(new URL('assets/favicon.svg', output)), false);
     assert.equal(existsSync(new URL('MANUAL.md', output)), true);
     assert.equal(existsSync(new URL('config.example.json', output)), false);
     assert.equal(existsSync(new URL('README.md', output)), false);

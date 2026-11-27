@@ -1,10 +1,10 @@
-const CACHE_NAME = 'fcv-shell-v1.4.1';
+const CACHE_NAME = 'fcv-shell-v1.4.2';
 const SHELL_FILES = [
   './',
   './index.html',
   './styles.css',
   './MANUAL.md',
-  './assets/favicon.svg',
+  './assets/icone-franlin-car.png',
   './js/app.js',
   './js/store.js',
   './js/ui.js',

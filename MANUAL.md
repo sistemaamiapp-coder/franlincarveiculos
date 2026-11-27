@@ -1,6 +1,6 @@
 # Manual do Franlin Car Veículos
 
-Bem-vindo ao manual do **Franlin Car Veículos**, versão **1.4.1**. O sistema organiza as **ordens de serviço**, chamadas de **O.S.**, e o **estoque da loja** de forma simples e direta.
+Bem-vindo ao manual do **Franlin Car Veículos**, versão **1.4.2**. O sistema organiza as **ordens de serviço**, chamadas de **O.S.**, e o **estoque da loja** de forma simples e direta.
 
 Os dados da conta ficam salvos na nuvem e também em cache no dispositivo. Com internet, as alterações aparecem nos outros computadores que usam a mesma conta. Contas diferentes têm dados separados.
 
@@ -54,7 +54,7 @@ O menu oferece:
 - **Estoque:** cadastra peças, registra entradas e saídas e consulta o histórico.
 - **Ajuda e manual:** mostra a situação da conta e, no final da página, o manual completo.
 
-No computador, o menu fica à esquerda. Em tela pequena, toque no botão de menu no topo. A interface usa azul e branco, com menu azul-marinho e área de trabalho clara. Cores de alerta continuam identificando erros, cancelamentos e ações de exclusão. Os endereços usam `#`, por exemplo, `#/ordens`; isso é normal e não compartilha dados sem login.
+No computador, o menu fica à esquerda. Em tela pequena, toque no botão de menu no topo. A interface usa azul e branco, com menu azul-marinho e área de trabalho clara. A marca e o ícone do navegador usam a imagem da oficina em amarelo, preto e prata. Cores de alerta continuam identificando erros, cancelamentos e ações de exclusão. Os endereços usam `#`, por exemplo, `#/ordens`; isso é normal e não compartilha dados sem login.
 
 A página volta ao início somente ao trocar de tela ou de passo do assistente. Atualizações automáticas de sincronização não alteram a posição de leitura.
 
@@ -78,7 +78,7 @@ O selo no topo e no menu mostra:
 
 Para conferir manualmente, abra **Ajuda e manual** e clique em **Sincronizar agora**. O sistema também verifica a nuvem periodicamente, ao voltar para a aba e ao recuperar a conexão.
 
-Depois que o sistema já foi carregado, é possível consultar e alterar dados sem internet. As alterações ficam pendentes e são enviadas quando a conexão voltar. Não feche o navegador imediatamente após uma operação importante se ainda houver alterações pendentes.
+Depois que o sistema já foi carregado, é possível consultar e alterar dados sem internet. As alterações ficam pendentes e são enviadas quando a conexão voltar, mesmo depois de fechar e reabrir o navegador. Não apague os dados do site nem use a limpeza de dados de navegação enquanto houver alterações pendentes.
 
 ### Como resolver um conflito
 
@@ -386,4 +386,4 @@ O manual deve acompanhar o aplicativo. Toda mudança funcional, de interface ou 
 
 ---
 
-Franlin Car Veículos · Manual do usuário · Versão 1.4.1
+Franlin Car Veículos · Manual do usuário · Versão 1.4.2
