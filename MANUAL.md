@@ -1,6 +1,6 @@
 # Manual do Franlin Car Veículos
 
-Bem-vindo ao manual do **Franlin Car Veículos**, versão **1.4.0**. O sistema organiza as **ordens de serviço**, chamadas de **O.S.**, e o **estoque da loja** de forma simples e direta.
+Bem-vindo ao manual do **Franlin Car Veículos**, versão **1.4.1**. O sistema organiza as **ordens de serviço**, chamadas de **O.S.**, e o **estoque da loja** de forma simples e direta.
 
 Os dados da conta ficam salvos na nuvem e também em cache no dispositivo. Com internet, as alterações aparecem nos outros computadores que usam a mesma conta. Contas diferentes têm dados separados.
 
@@ -39,7 +39,7 @@ Além das O.S., o sistema possui a tela **Estoque**. Cliente e veículo continua
 2. Na tela **Entrar na sua conta**, informe seu e-mail e sua senha.
 3. Se for o primeiro acesso, clique em **Criar conta** e preencha e-mail, senha e repetição da senha.
 4. A conta abre diretamente após o cadastro. Não é necessário confirmar o e-mail.
-5. Use **Manter conectado neste computador** somente em um dispositivo próprio e protegido.
+5. Ao entrar, o acesso fica salvo neste navegador para você não precisar digitar a senha a cada visita. Em outro computador, entre com a mesma conta para acessar e sincronizar os mesmos dados.
 
 Se esquecer a senha, clique em **Esqueci minha senha**, informe o e-mail e siga o link recebido. Confira também a caixa de spam. O sistema não mostra nem reenvia sua senha atual.
 
@@ -386,4 +386,4 @@ O manual deve acompanhar o aplicativo. Toda mudança funcional, de interface ou 
 
 ---
 
-Franlin Car Veículos · Manual do usuário · Versão 1.4.0
+Franlin Car Veículos · Manual do usuário · Versão 1.4.1

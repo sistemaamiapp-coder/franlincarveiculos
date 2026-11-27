@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fcv-shell-v1.4.0';
+const CACHE_NAME = 'fcv-shell-v1.4.1';
 const SHELL_FILES = [
   './',
   './index.html',

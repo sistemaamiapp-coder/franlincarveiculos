@@ -214,7 +214,6 @@ export function authView({ mode = 'login', error = '', email = '', configured = 
           ${field({ label: 'E-mail', name: 'email', value: email, type: 'email', required: true, span: 2, placeholder: 'voce@exemplo.com', attrs: 'autocomplete="email"' })}
           ${mode !== 'recover' ? field({ label: 'Senha', name: 'password', type: 'password', required: true, span: 2, placeholder: 'Sua senha', attrs: `autocomplete="${mode === 'signup' ? 'new-password' : 'current-password'}" minlength="6"` }) : ''}
           ${mode === 'signup' ? field({ label: 'Repita a senha', name: 'passwordConfirm', type: 'password', required: true, span: 2, placeholder: 'Repita a senha', attrs: 'autocomplete="new-password" minlength="6"' }) : ''}
-          ${mode === 'login' ? `<label class="check-field field-span2"><input type="checkbox" name="remember" value="1"> Manter conectado neste computador</label>` : ''}
           <div class="form-actions field-span2">
             <button class="btn btn-primary" type="submit">${mode === 'login' ? 'Entrar' : mode === 'signup' ? 'Criar conta' : 'Enviar link de recuperação'}</button>
           </div>

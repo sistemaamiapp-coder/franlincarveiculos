@@ -3987,7 +3987,22 @@ a.record-card:hover {
 }
 
 .auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
   margin-bottom: 28px;
+}
+
+.auth-brand .brand-copy strong {
+  color: var(--sidebar-bg);
+}
+
+.auth-brand .brand-copy strong span {
+  color: var(--primary);
+}
+
+.auth-brand .brand-copy small {
+  color: var(--muted);
 }
 
 .auth-card h1,

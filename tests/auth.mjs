@@ -37,26 +37,29 @@ function setup(fetchImpl) {
   return { client, localStorage, sessionStorage, calls };
 }
 
-test('auth: entrada grava sessão temporária sem expor token em URL', async () => {
+test('auth: entrada grava sessão persistente sem expor token em URL', async () => {
   const { client, localStorage, sessionStorage, calls } = setup(async (url, options) => {
     assert.match(url, /\/auth\/v1\/token\?grant_type=password$/);
     assert.doesNotMatch(url, /access-token|refresh-token|oficina@/);
     assert.equal(options.headers.get('apikey'), config.supabaseAnonKey);
     return response(200, session);
   });
-  await client.signIn('oficina@example.com', 'senha-segura', false);
+  await client.signIn('oficina@example.com', 'senha-segura');
   assert.equal(client.user.email, 'oficina@example.com');
-  assert.equal(localStorage.getItem('fcv.auth.session.v1'), null);
-  assert.ok(sessionStorage.getItem('fcv.auth.session.v1').includes('refresh-token'));
+  assert.ok(localStorage.getItem('fcv.auth.session.v1').includes('refresh-token'));
+  assert.equal(sessionStorage.getItem('fcv.auth.session.v1'), null);
   assert.equal(calls.length, 1);
 });
 
-test('auth: manter conectado usa armazenamento local', async () => {
-  const { client, localStorage, sessionStorage } = setup(async () => response(200, session));
-  await client.signIn('oficina@example.com', 'senha-segura', true);
+test('auth: sessão temporária antiga é migrada para armazenamento local', async () => {
+  const { client, localStorage, sessionStorage } = setup(async () => {
+    throw new Error('A sessão válida não deve precisar de rede.');
+  });
+  sessionStorage.setItem('fcv.auth.session.v1', JSON.stringify(session));
+  const restored = await client.restoreSession();
+  assert.equal(restored.access_token, session.access_token);
   assert.ok(localStorage.getItem('fcv.auth.session.v1').includes('refresh-token'));
   assert.equal(sessionStorage.getItem('fcv.auth.session.v1'), null);
-  assert.equal(localStorage.getItem('fcv.auth.remember.v1'), '1');
 });
 
 test('auth: cadastro com confirmação de e-mail não cria sessão', async () => {
@@ -67,7 +70,7 @@ test('auth: cadastro com confirmação de e-mail não cria sessão', async () =>
     return response(200, { id: session.user.id, email: body.email });
   });
   globalThis.location = { origin: 'https://sistema.example', pathname: '/franlincarveiculos/' };
-  const result = await client.signUp('nova@example.com', 'senha-segura', false);
+  const result = await client.signUp('nova@example.com', 'senha-segura');
   assert.equal(result.access_token, undefined);
   assert.equal(client.user, null);
   assert.equal(localStorage.getItem('fcv.auth.session.v1'), null);
@@ -92,7 +95,7 @@ test('auth: recuperação de senha usa endpoint próprio e redirecionamento segu
 
 test('auth: resposta 401 renova a sessão e repete a consulta uma vez', async () => {
   let workspaceCalls = 0;
-  const { client } = setup(async (url) => {
+  const { client, localStorage, sessionStorage } = setup(async (url) => {
     if (url.includes('grant_type=refresh_token')) return response(200, { ...session, access_token: 'novo-access' });
     if (url.includes('/auth/v1/user')) return response(200, session.user);
     workspaceCalls += 1;
@@ -100,10 +103,12 @@ test('auth: resposta 401 renova a sessão e repete a consulta uma vez', async ()
     assert.equal(url.includes('owner_id=eq.00000000-0000-4000-8000-000000000001'), true);
     return response(200, [{ state: { version: 1 }, revision: 3, updated_at: '2026-11-25T12:00:00Z' }]);
   });
-  client.saveSession(session, false);
+  client.saveSession(session);
   const result = await client.fetchWorkspace();
   assert.equal(workspaceCalls, 2);
   assert.equal(result.revision, 3);
+  assert.ok(localStorage.getItem('fcv.auth.session.v1').includes('novo-access'));
+  assert.equal(sessionStorage.getItem('fcv.auth.session.v1'), null);
 });
 
 test('auth: sessão inválida é descartada e erro é apresentado', async () => {

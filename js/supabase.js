@@ -1,5 +1,4 @@
 const SESSION_KEY = 'fcv.auth.session.v1';
-const REMEMBER_KEY = 'fcv.auth.remember.v1';
 let configPromise = null;
 
 function cleanConfig(value) {
@@ -58,28 +57,25 @@ export class SupabaseClient {
     return this.session?.user || null;
   }
 
-  get remember() {
-    return this.localStorage?.getItem(REMEMBER_KEY) === '1';
-  }
-
-  saveSession(session, remember = false) {
+  saveSession(session) {
     this.session = session;
-    const target = remember ? this.localStorage : this.sessionStorage;
     this.sessionStorage?.removeItem(SESSION_KEY);
     this.localStorage?.removeItem(SESSION_KEY);
-    if (remember) this.localStorage?.setItem(REMEMBER_KEY, '1');
-    else {
-      this.localStorage?.removeItem(REMEMBER_KEY);
-      target?.setItem(SESSION_KEY, JSON.stringify(session));
-    }
-    if (remember) target?.setItem(SESSION_KEY, JSON.stringify(session));
+    this.localStorage?.setItem(SESSION_KEY, JSON.stringify(session));
   }
 
   readStoredSession() {
-    const raw = this.localStorage?.getItem(SESSION_KEY) || this.sessionStorage?.getItem(SESSION_KEY);
+    const localRaw = this.localStorage?.getItem(SESSION_KEY);
+    const sessionRaw = this.sessionStorage?.getItem(SESSION_KEY);
+    const raw = localRaw || sessionRaw;
     if (!raw) return null;
     try {
-      return JSON.parse(raw);
+      const stored = JSON.parse(raw);
+      if (!localRaw && sessionRaw) {
+        this.localStorage?.setItem(SESSION_KEY, sessionRaw);
+        this.sessionStorage?.removeItem(SESSION_KEY);
+      }
+      return stored;
     } catch {
       this.clearSession();
       return null;
@@ -90,7 +86,6 @@ export class SupabaseClient {
     this.session = null;
     this.sessionStorage?.removeItem(SESSION_KEY);
     this.localStorage?.removeItem(SESSION_KEY);
-    this.localStorage?.removeItem(REMEMBER_KEY);
   }
 
   async request(path, options = {}, retry = true) {
@@ -124,16 +119,16 @@ export class SupabaseClient {
     return payload;
   }
 
-  async signIn(email, password, remember = false) {
+  async signIn(email, password) {
     const session = await this.request('/auth/v1/token?grant_type=password', {
       method: 'POST',
       body: JSON.stringify({ email: String(email).trim(), password })
     });
-    this.saveSession(session, remember);
+    this.saveSession(session);
     return session;
   }
 
-  async signUp(email, password, remember = false) {
+  async signUp(email, password) {
     const redirectTo = globalThis.location ? `${globalThis.location.origin}${globalThis.location.pathname}` : undefined;
     const session = await this.request('/auth/v1/signup', {
       method: 'POST',
@@ -143,7 +138,7 @@ export class SupabaseClient {
         ...(redirectTo ? { emailRedirectTo: redirectTo } : {})
       })
     });
-    if (session?.access_token) this.saveSession(session, remember);
+    if (session?.access_token) this.saveSession(session);
     return session;
   }
 
@@ -183,7 +178,7 @@ export class SupabaseClient {
           method: 'POST',
           body: JSON.stringify({ refresh_token: refreshToken })
         }, false);
-        this.saveSession(session, this.remember);
+        this.saveSession(session);
         return session;
       } catch (error) {
         if (error instanceof SupabaseAuthError && [400, 401, 403].includes(error.status)) this.clearSession();

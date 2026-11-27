@@ -283,6 +283,17 @@ test('interface: tema claro azul e branco e versões sincronizadas', () => {
   assert.ok(readme.includes(`versão atual é **${pkg.version}**`));
 });
 
+test('interface: marca do login fica visível e não oferece sessão temporária', () => {
+  const login = UI.authView({ mode: 'login' });
+  const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  assert.match(login, /<span class="brand-copy">/);
+  assert.match(login, /FRANLIN <span>CAR<\/span>/);
+  assert.doesNotMatch(login, /Manter conectado|name="remember"/);
+  assert.match(css, /\.auth-brand\s*\{[^}]*display:\s*flex/);
+  assert.match(css, /\.auth-brand \.brand-copy strong\s*\{[^}]*color:\s*var\(--sidebar-bg\)/);
+  assert.match(css, /\.auth-brand \.brand-copy small\s*\{[^}]*color:\s*var\(--muted\)/);
+});
+
 test('publicação: Vercel copia somente o shell e gera a configuração pública', async () => {
   const output = new URL('../.vercel/output/static/', import.meta.url);
   const previousUrl = process.env.SUPABASE_URL;

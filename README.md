@@ -1,6 +1,6 @@
 # Franlin Car Veículos
 
-Sistema simples de ordens de serviço para oficina, em português brasileiro, com área independente de estoque, frontend estático, conta por e-mail/senha e sincronização na nuvem. A versão atual é **1.4.0**.
+Sistema simples de ordens de serviço para oficina, em português brasileiro, com área independente de estoque, frontend estático, conta por e-mail/senha e sincronização na nuvem. A versão atual é **1.4.1**.
 
 ## Recursos
 

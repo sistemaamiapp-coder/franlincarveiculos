@@ -8,7 +8,7 @@ import {
   vehicleTitle, fileStamp, nowISO, round2, isInMonth
 } from './util.js';
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 const root = document.getElementById('app');
 
 const viewState = {
@@ -2035,7 +2035,7 @@ async function submitAuth(form) {
     }
     if (mode === 'signup' && values.password !== values.passwordConfirm) throw new Error('As senhas não são iguais. Digite novamente.');
     if (mode === 'signup') {
-      const session = await authClient.signUp(authEmail, values.password, Boolean(values.remember));
+      const session = await authClient.signUp(authEmail, values.password);
       if (!session?.access_token) {
         authNotice = 'Conta criada. Confirme o link enviado ao e-mail e depois entre com sua senha.';
         authMode = 'login';
@@ -2043,7 +2043,7 @@ async function submitAuth(form) {
         return;
       }
     } else {
-      await authClient.signIn(authEmail, values.password, Boolean(values.remember));
+      await authClient.signIn(authEmail, values.password);
     }
     await openWorkspace();
   } catch (error) {
