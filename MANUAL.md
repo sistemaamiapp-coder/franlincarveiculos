@@ -1,6 +1,6 @@
 # Manual do Franlin Car Veículos
 
-Bem-vindo ao manual do **Franlin Car Veículos**, versão **1.4.2**. O sistema organiza as **ordens de serviço**, chamadas de **O.S.**, e o **estoque da loja** de forma simples e direta.
+Bem-vindo ao manual do **Franlin Car Veículos**, versão **1.4.3**. O sistema organiza as **ordens de serviço**, chamadas de **O.S.**, e o **estoque da loja** de forma simples e direta.
 
 Os dados da conta ficam salvos na nuvem e também em cache no dispositivo. Com internet, as alterações aparecem nos outros computadores que usam a mesma conta. Contas diferentes têm dados separados.
 
@@ -79,6 +79,8 @@ O selo no topo e no menu mostra:
 Para conferir manualmente, abra **Ajuda e manual** e clique em **Sincronizar agora**. O sistema também verifica a nuvem periodicamente, ao voltar para a aba e ao recuperar a conexão.
 
 Depois que o sistema já foi carregado, é possível consultar e alterar dados sem internet. As alterações ficam pendentes e são enviadas quando a conexão voltar, mesmo depois de fechar e reabrir o navegador. Não apague os dados do site nem use a limpeza de dados de navegação enquanto houver alterações pendentes.
+
+Com internet, o sistema verifica se há arquivos novos antes de usar a cópia offline. Isso mantém a marca, o menu e as demais telas atualizados sem apagar os dados da conta.
 
 ### Como resolver um conflito
 
@@ -336,6 +338,10 @@ Verifique se há peças em quantidade suficiente. Orçamentos não baixam estoqu
 
 Cada número é único. Altere o número na revisão para um valor ainda não usado.
 
+### A marca ou o menu aparecem com aparência antiga
+
+Atualize a página com internet. O sistema busca os arquivos mais recentes antes de usar o cache offline. Se a aparência antiga continuar, pressione **Ctrl+F5** no Windows ou **Command+Shift+R** no Mac.
+
 ### Os dados não aparecem em outro computador
 
 1. Confira se entrou com a mesma conta.
@@ -386,4 +392,4 @@ O manual deve acompanhar o aplicativo. Toda mudança funcional, de interface ou 
 
 ---
 
-Franlin Car Veículos · Manual do usuário · Versão 1.4.2
+Franlin Car Veículos · Manual do usuário · Versão 1.4.3

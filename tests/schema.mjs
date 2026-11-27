@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 
 const tests = [];
 function test(name, run) { tests.push({ name, run }); }
@@ -43,6 +44,49 @@ test('schema: arquivo de conflito é limitado e pertence ao próprio usuário', 
   assert.match(schema, /create or replace function public\.fcv_clear_conflict_archive/i);
 });
 
+test('service worker: usa arquivos atuais com internet e cache somente offline', async () => {
+  const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
+  const origin = 'https://franlincarveiculos.vercel.app';
+  const cached = new Response('arquivo-antigo');
+  let fetchHandler;
+  let networkCalls = 0;
+  let cacheWrites = 0;
+  const sandbox = {
+    self: {
+      location: { origin },
+      addEventListener: (type, handler) => { if (type === 'fetch') fetchHandler = handler; },
+      skipWaiting() {},
+      clients: { claim() {} }
+    },
+    caches: {
+      match: async () => cached,
+      open: async () => ({ put: async () => { cacheWrites += 1; } })
+    },
+    fetch: async () => {
+      networkCalls += 1;
+      return new Response('arquivo-atual');
+    },
+    URL,
+    Response
+  };
+  vm.runInNewContext(sw, sandbox);
+  let responsePromise;
+  fetchHandler({
+    request: new Request(`${origin}/js/ui.js`),
+    respondWith: (promise) => { responsePromise = promise; }
+  });
+  assert.equal(await (await responsePromise).text(), 'arquivo-atual');
+  assert.equal(networkCalls, 1);
+  assert.equal(cacheWrites, 1);
+
+  sandbox.fetch = async () => { throw new Error('Sem conexão.'); };
+  fetchHandler({
+    request: new Request(`${origin}/js/ui.js`),
+    respondWith: (promise) => { responsePromise = promise; }
+  });
+  assert.equal(await (await responsePromise).text(), 'arquivo-antigo');
+});
+
 test('interface: CSP e service worker não autorizam scripts inseguros nem cache da nuvem', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
@@ -59,7 +103,7 @@ test('interface: CSP e service worker não autorizam scripts inseguros nem cache
 let failures = 0;
 for (const { name, run } of tests) {
   try {
-    run();
+    await run();
     console.log(`PASS ${name}`);
   } catch (error) {
     failures += 1;
